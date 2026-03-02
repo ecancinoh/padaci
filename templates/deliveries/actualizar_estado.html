@@ -1,0 +1,54 @@
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+{% block title %}Actualizar Estado – {{ entrega.cliente }} – PADACI{% endblock %}
+{% block active_deliveries %}active{% endblock %}
+
+{% block page_heading %}
+<div class="d-sm-flex align-items-center justify-content-between mb-4">
+  <h1 class="h3 mb-0 text-gray-800">
+    <i class="fas fa-sync mr-2 text-success"></i>Actualizar Estado – {{ entrega.cliente }}
+  </h1>
+  <a href="{% url 'deliveries:detail' entrega.pk %}" class="btn btn-secondary btn-sm"><i class="fas fa-arrow-left mr-1"></i> Volver</a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+  <div class="col-lg-5">
+    <div class="card shadow mb-4">
+      <div class="card-header py-3"><h6 class="m-0 font-weight-bold text-success">Actualizar Estado de la Entrega</h6></div>
+      <div class="card-body">
+        <form method="post" enctype="multipart/form-data">
+          {% csrf_token %}
+          {{ form|crispy }}
+          <hr>
+          <button type="submit" class="btn btn-success"><i class="fas fa-check mr-1"></i> Guardar Estado</button>
+          <a href="{% url 'deliveries:detail' entrega.pk %}" class="btn btn-secondary ml-2">Cancelar</a>
+        </form>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-7">
+    <div class="card shadow mb-4">
+      <div class="card-header py-3"><h6 class="m-0 font-weight-bold text-primary">Datos de la Entrega</h6></div>
+      <div class="card-body">
+        <dl class="row">
+          <dt class="col-sm-5">Cliente:</dt><dd class="col-sm-7">{{ entrega.cliente }}</dd>
+          <dt class="col-sm-5">Empresa:</dt><dd class="col-sm-7">{{ entrega.empresa.nombre|default:"–" }}</dd>
+          <dt class="col-sm-5">Comuna:</dt><dd class="col-sm-7">{{ entrega.cliente.comuna|default:"–" }}</dd>
+          <dt class="col-sm-5">Estado actual:</dt>
+          <dd class="col-sm-7">
+            <span class="badge badge-warning">{{ entrega.get_estado_display }}</span>
+          </dd>
+        </dl>
+        {% if entrega.cliente.tiene_coordenadas %}
+        <a href="https://waze.com/ul?ll={{ entrega.cliente.latitud }},{{ entrega.cliente.longitud }}&navigate=yes"
+           target="_blank" class="btn btn-info btn-sm btn-block mt-2">
+          <i class="fab fa-waze mr-1"></i> Navegar con Waze
+        </a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

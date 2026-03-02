@@ -1,0 +1,52 @@
+{% extends 'base.html' %}
+{% block title %}Detalle Usuario – PADACI{% endblock %}
+{% block active_accounts %}active{% endblock %}
+
+{% block page_heading %}
+<div class="d-sm-flex align-items-center justify-content-between mb-4">
+  <h1 class="h3 mb-0 text-gray-800"><i class="fas fa-user mr-2 text-primary"></i>{{ usuario.get_full_name }}</h1>
+  <div>
+    <a href="{% url 'accounts:update' usuario.pk %}" class="btn btn-warning btn-sm"><i class="fas fa-edit mr-1"></i> Editar</a>
+    <a href="{% url 'accounts:list' %}" class="btn btn-secondary btn-sm"><i class="fas fa-arrow-left mr-1"></i> Volver</a>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+  <div class="col-lg-4">
+    <div class="card shadow mb-4">
+      <div class="card-body text-center">
+        {% if usuario.foto %}
+          <img src="{{ usuario.foto.url }}" class="img-fluid rounded-circle mb-3" style="width:120px;height:120px;object-fit:cover;">
+        {% else %}
+          <div class="rounded-circle bg-primary text-white d-inline-flex align-items-center justify-content-center mb-3" style="width:120px;height:120px;font-size:3rem;font-weight:bold;">
+            {{ usuario.first_name|first|upper }}{{ usuario.last_name|first|upper }}
+          </div>
+        {% endif %}
+        <h5 class="font-weight-bold">{{ usuario.get_full_name }}</h5>
+        <p class="text-muted">{{ usuario.get_rol_display }}</p>
+        <span class="badge badge-{% if usuario.activo %}success{% else %}danger{% endif %}">
+          {% if usuario.activo %}Activo{% else %}Inactivo{% endif %}
+        </span>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-8">
+    <div class="card shadow mb-4">
+      <div class="card-header py-3"><h6 class="m-0 font-weight-bold text-primary">Información del Usuario</h6></div>
+      <div class="card-body">
+        <dl class="row">
+          <dt class="col-sm-4">Usuario:</dt><dd class="col-sm-8">{{ usuario.username }}</dd>
+          <dt class="col-sm-4">Nombre:</dt><dd class="col-sm-8">{{ usuario.get_full_name }}</dd>
+          <dt class="col-sm-4">Correo:</dt><dd class="col-sm-8">{{ usuario.email }}</dd>
+          <dt class="col-sm-4">RUT:</dt><dd class="col-sm-8">{{ usuario.rut|default:"–" }}</dd>
+          <dt class="col-sm-4">Teléfono:</dt><dd class="col-sm-8">{{ usuario.telefono|default:"–" }}</dd>
+          <dt class="col-sm-4">Rol:</dt><dd class="col-sm-8">{{ usuario.get_rol_display }}</dd>
+          <dt class="col-sm-4">Registrado:</dt><dd class="col-sm-8">{{ usuario.date_joined }}</dd>
+        </dl>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

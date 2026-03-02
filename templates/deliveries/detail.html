@@ -1,0 +1,74 @@
+{% extends 'base.html' %}
+{% block title %}Entrega {{ entrega.cliente }} – PADACI{% endblock %}
+{% block active_deliveries %}active{% endblock %}
+
+{% block page_heading %}
+<div class="d-sm-flex align-items-center justify-content-between mb-4">
+  <h1 class="h3 mb-0 text-gray-800">
+    <i class="fas fa-box mr-2 text-primary"></i>Entrega: {{ entrega.cliente }}
+  </h1>
+  <div>
+    <a href="{% url 'deliveries:update_estado' entrega.pk %}" class="btn btn-success btn-sm"><i class="fas fa-sync mr-1"></i>Actualizar Estado</a>
+    <a href="{% url 'deliveries:update' entrega.pk %}" class="btn btn-warning btn-sm"><i class="fas fa-edit"></i></a>
+    <a href="{% url 'deliveries:list' %}" class="btn btn-secondary btn-sm"><i class="fas fa-arrow-left"></i> Volver</a>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+  <div class="col-lg-6">
+    <div class="card shadow mb-4">
+      <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">Datos de la Entrega</h6>
+      </div>
+      <div class="card-body">
+        <dl class="row">
+          <dt class="col-sm-5">Cliente:</dt>
+          <dd class="col-sm-7"><a href="{% url 'clients:detail' entrega.cliente.pk %}">{{ entrega.cliente }}</a></dd>
+          <dt class="col-sm-5">Empresa:</dt>
+          <dd class="col-sm-7">{% if entrega.empresa %}<a href="{% url 'companies:detail' entrega.empresa.pk %}">{{ entrega.empresa.nombre }}</a>{% else %}–{% endif %}</dd>
+          <dt class="col-sm-5">Conductor:</dt><dd class="col-sm-7">{{ entrega.conductor|default:"Sin asignar" }}</dd>
+          <dt class="col-sm-5">Descripción:</dt><dd class="col-sm-7">{{ entrega.descripcion|default:"–" }}</dd>
+          <dt class="col-sm-5">Fecha Programada:</dt><dd class="col-sm-7">{{ entrega.fecha_programada }}</dd>
+          <dt class="col-sm-5">Fecha Entrega:</dt><dd class="col-sm-7">{{ entrega.fecha_entrega|default:"–" }}</dd>
+          <dt class="col-sm-5">Estado:</dt>
+          <dd class="col-sm-7">
+            <span class="badge badge-{% if entrega.estado == 'entregado' %}success{% elif entrega.estado == 'pendiente' %}warning{% elif entrega.estado == 'fallido' %}danger{% elif entrega.estado == 'en_ruta' %}primary{% else %}secondary{% endif %} badge-lg">
+              {{ entrega.get_estado_display }}
+            </span>
+          </dd>
+          <dt class="col-sm-5">Observación:</dt><dd class="col-sm-7">{{ entrega.observacion|default:"–" }}</dd>
+        </dl>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <!-- Evidencia foto -->
+    {% if entrega.foto_evidencia %}
+    <div class="card shadow mb-4">
+      <div class="card-header py-3"><h6 class="m-0 font-weight-bold text-success"><i class="fas fa-camera mr-1"></i> Foto Evidencia</h6></div>
+      <div class="card-body text-center">
+        <img src="{{ entrega.foto_evidencia.url }}" class="img-fluid rounded shadow-sm" alt="Evidencia de entrega">
+      </div>
+    </div>
+    {% endif %}
+    <!-- Dirección cliente -->
+    <div class="card shadow mb-4">
+      <div class="card-header py-3"><h6 class="m-0 font-weight-bold text-primary"><i class="fas fa-map-marker-alt mr-1"></i>Dirección de Entrega</h6></div>
+      <div class="card-body">
+        <p><strong>{{ entrega.cliente }}</strong></p>
+        <p>{{ entrega.cliente.comuna|default:"–" }}</p>
+        {% if entrega.cliente.tiene_coordenadas %}
+          <a href="https://waze.com/ul?ll={{ entrega.cliente.latitud }},{{ entrega.cliente.longitud }}&navigate=yes" target="_blank" class="btn btn-info btn-sm">
+            <i class="fab fa-waze mr-1"></i> Abrir en Waze
+          </a>
+          <a href="https://www.google.com/maps/dir/?api=1&destination={{ entrega.cliente.latitud }},{{ entrega.cliente.longitud }}" target="_blank" class="btn btn-outline-primary btn-sm ml-1">
+            <i class="fas fa-map mr-1"></i> Google Maps
+          </a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

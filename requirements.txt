@@ -1,0 +1,32 @@
+# ── Core ────────────────────────────────────────────────────
+Django==4.2.11
+mysqlclient==2.2.4
+python-decouple==3.8
+Pillow==10.3.0
+
+# ── Forms & UI helpers ───────────────────────────────────────
+django-crispy-forms==2.1
+crispy-bootstrap4==2023.1
+
+# ── Authentication & Permissions ─────────────────────────────
+django-allauth==0.61.1
+
+# ── REST (for AJAX/API endpoints) ────────────────────────────
+djangorestframework==3.15.1
+
+# ── Maps ─────────────────────────────────────────────────────
+# Leaflet handled via CDN in templates
+folium==0.16.0
+
+# ── OCR (AI – free / open-source) ────────────────────────────
+easyocr==1.7.1
+
+# ── Route optimisation (Google OR-Tools – free) ──────────────
+ortools==9.9.3963
+
+# ── Utilities ────────────────────────────────────────────────
+django-tables2==2.7.0
+django-filter==23.5
+django-import-export==3.3.7
+whitenoise==6.6.0
+gunicorn==21.2.0

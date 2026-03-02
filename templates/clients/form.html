@@ -1,0 +1,148 @@
+{% extends 'base.html' %}
+{% block title %}{{ titulo }} – PADACI{% endblock %}
+{% block active_clients %}active{% endblock %}
+
+{% block page_heading %}
+<div class="d-sm-flex align-items-center justify-content-between mb-4">
+  <h1 class="h3 mb-0 text-gray-800"><i class="fas fa-user-plus mr-2 text-primary"></i>{{ titulo }}</h1>
+  <a href="{% url 'clients:list' %}" class="btn btn-secondary btn-sm"><i class="fas fa-arrow-left mr-1"></i> Volver</a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-xl-8">
+    <div class="card shadow mb-4">
+      <div class="card-header py-3"><h6 class="m-0 font-weight-bold text-primary">{{ titulo }}</h6></div>
+      <div class="card-body">
+        <form method="post">
+          {% csrf_token %}
+
+          <!-- Nombre del Cliente -->
+          <div class="form-group">
+            <label for="{{ form.nombre.id_for_label }}" class="font-weight-bold">
+              <i class="fas fa-user mr-1 text-primary"></i> Nombre del Cliente <span class="text-danger">*</span>
+            </label>
+            {{ form.nombre }}
+            {% if form.nombre.errors %}<div class="text-danger small mt-1">{{ form.nombre.errors }}</div>{% endif %}
+          </div>
+
+          <!-- Comuna -->
+          <div class="form-group">
+            <label for="{{ form.comuna.id_for_label }}" class="font-weight-bold">
+              <i class="fas fa-map-marker-alt mr-1 text-primary"></i> Comuna <span class="text-danger">*</span>
+            </label>
+            {{ form.comuna }}
+            {% if form.comuna.errors %}<div class="text-danger small mt-1">{{ form.comuna.errors }}</div>{% endif %}
+          </div>
+
+          <!-- Coordenadas -->
+          <div class="row">
+            <div class="col-md-6">
+              <div class="form-group">
+                <label for="{{ form.latitud.id_for_label }}" class="font-weight-bold">
+                  <i class="fas fa-crosshairs mr-1 text-primary"></i> Latitud
+                </label>
+                {{ form.latitud }}
+                {% if form.latitud.errors %}<div class="text-danger small mt-1">{{ form.latitud.errors }}</div>{% endif %}
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="form-group">
+                <label for="{{ form.longitud.id_for_label }}" class="font-weight-bold">
+                  <i class="fas fa-crosshairs mr-1 text-primary"></i> Longitud
+                </label>
+                {{ form.longitud }}
+                {% if form.longitud.errors %}<div class="text-danger small mt-1">{{ form.longitud.errors }}</div>{% endif %}
+              </div>
+            </div>
+          </div>
+
+          <!-- URLs generadas automáticamente -->
+          <div id="url-preview-section" class="d-none">
+            <hr>
+            <h6 class="font-weight-bold text-gray-700 mb-3"><i class="fas fa-link mr-1"></i> Links de navegación generados</h6>
+            <div class="row">
+              <div class="col-md-6 mb-3">
+                <label class="font-weight-bold small text-uppercase text-muted">
+                  <i class="fas fa-map mr-1"></i> Google Maps
+                </label>
+                <div class="input-group">
+                  <input type="text" id="url_gmaps_preview" class="form-control form-control-sm bg-light" readonly>
+                  <div class="input-group-append">
+                    <a id="btn_gmaps" href="#" target="_blank" class="btn btn-sm btn-outline-danger">
+                      <i class="fas fa-external-link-alt"></i>
+                    </a>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-6 mb-3">
+                <label class="font-weight-bold small text-uppercase text-muted">
+                  <i class="fas fa-route mr-1"></i> Waze
+                </label>
+                <div class="input-group">
+                  <input type="text" id="url_waze_preview" class="form-control form-control-sm bg-light" readonly>
+                  <div class="input-group-append">
+                    <a id="btn_waze" href="#" target="_blank" class="btn btn-sm btn-outline-primary">
+                      <i class="fas fa-external-link-alt"></i>
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="alert alert-success alert-sm py-2">
+              <i class="fas fa-mobile-alt mr-1"></i>
+              Desde el celular, estos links abrirán directamente <strong>Google Maps</strong> o <strong>Waze</strong>.
+            </div>
+          </div>
+
+          <div class="alert alert-info alert-sm mt-2">
+            <i class="fas fa-info-circle mr-1"></i>
+            Ingresa latitud y longitud para ver los links de navegación.
+            Obtén las coordenadas haciendo clic derecho en <a href="https://maps.google.com" target="_blank">Google Maps</a>.
+          </div>
+          <hr>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save mr-1"></i> Guardar</button>
+          <a href="{% url 'clients:list' %}" class="btn btn-secondary ml-2">Cancelar</a>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  var latInput  = document.getElementById('{{ form.latitud.id_for_label }}');
+  var lonInput  = document.getElementById('{{ form.longitud.id_for_label }}');
+  var section   = document.getElementById('url-preview-section');
+  var gmapsInput = document.getElementById('url_gmaps_preview');
+  var wazeInput  = document.getElementById('url_waze_preview');
+  var btnGmaps   = document.getElementById('btn_gmaps');
+  var btnWaze    = document.getElementById('btn_waze');
+
+  function updateUrls() {
+    var lat = latInput.value.trim();
+    var lon = lonInput.value.trim();
+    if (lat && lon && !isNaN(lat) && !isNaN(lon)) {
+      var gmaps = 'https://maps.google.com/?q=' + lat + ',' + lon;
+      var waze  = 'https://waze.com/ul?ll=' + lat + ',' + lon + '&navigate=yes';
+      gmapsInput.value = gmaps;
+      wazeInput.value  = waze;
+      btnGmaps.href    = gmaps;
+      btnWaze.href     = waze;
+      section.classList.remove('d-none');
+    } else {
+      section.classList.add('d-none');
+    }
+  }
+
+  latInput.addEventListener('input', updateUrls);
+  lonInput.addEventListener('input', updateUrls);
+
+  // Si ya hay valores al cargar (edición)
+  updateUrls();
+})();
+</script>
+{% endblock %}

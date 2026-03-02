@@ -1,0 +1,122 @@
+{% extends 'base.html' %}
+{% block title %}Mapa de Clientes – Chile – PADACI{% endblock %}
+{% block active_maps %}active{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"/>
+<style>
+  #mapChile { height: calc(100vh - 250px); min-height: 500px; border-radius: 0.35rem; }
+  .map-legend { background: white; padding: 10px; line-height: 1.8; }
+</style>
+{% endblock %}
+
+{% block page_heading %}
+<div class="d-sm-flex align-items-center justify-content-between mb-4">
+  <h1 class="h3 mb-0 text-gray-800">
+    <i class="fas fa-map-marked-alt mr-2 text-primary"></i>Mapa de Chile – Clientes
+  </h1>
+  <div class="text-muted small">
+    <i class="fas fa-circle text-success mr-1"></i>{{ clientes.count }} clientes geolocalizados
+    &nbsp;|&nbsp;
+    <a href="{% url 'clients:create' %}" class="btn btn-sm btn-outline-primary">
+      <i class="fas fa-plus mr-1"></i>Nuevo Cliente
+    </a>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="card shadow mb-4">
+  <div class="card-header py-3 d-flex align-items-center justify-content-between">
+    <h6 class="m-0 font-weight-bold text-primary">Vista de Marcadores por Cliente</h6>
+    <span class="text-muted small">Haz clic en un marcador para ver detalles</span>
+  </div>
+  <div class="card-body p-0">
+    <div id="mapChile"></div>
+  </div>
+  <div class="card-footer text-muted small">
+    <i class="fas fa-info-circle mr-1"></i>
+    Los clientes sin coordenadas no aparecen en el mapa. Agrégalas desde
+    <a href="{% url 'clients:list' %}">el mantenedor de clientes</a>.
+  </div>
+</div>
+
+<!-- Tabla lateral de clientes sin coordenadas -->
+{% with sin_coords=clientes|length %}
+<div class="card shadow mb-4">
+  <div class="card-header py-3">
+    <h6 class="m-0 font-weight-bold text-warning">
+      <i class="fas fa-exclamation-triangle mr-1"></i>Clientes sin coordenadas
+    </h6>
+  </div>
+  <div class="card-body">
+    <div class="table-responsive">
+      <table class="table table-sm">
+        <thead class="thead-light"><tr><th>Cliente</th><th>Dirección</th><th>Ciudad</th><th>Acción</th></tr></thead>
+        <tbody>
+          {% for c in clientes %}
+            {% if not c.tiene_coordenadas %}
+            <tr>
+              <td>{{ c }}</td>
+              <td>{{ c.direccion }}</td>
+              <td>{{ c.ciudad }}</td>
+              <td><a href="{% url 'clients:update' c.pk %}" class="btn btn-warning btn-sm"><i class="fas fa-map-pin mr-1"></i>Agregar coords</a></td>
+            </tr>
+            {% endif %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endwith %}
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<script>
+// Centrado en Chile
+var map = L.map('mapChile').setView([-35.6751, -71.5429], 5);
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+  maxZoom: 19,
+}).addTo(map);
+
+// Cluster de marcadores
+var markers = L.markerClusterGroup();
+
+// Cargar clientes via GeoJSON API
+fetch('{% url "maps:geojson" %}')
+  .then(res => res.json())
+  .then(data => {
+    data.features.forEach(function(f) {
+      var props = f.properties;
+      var lat = f.geometry.coordinates[1];
+      var lon = f.geometry.coordinates[0];
+      var marker = L.marker([lat, lon]);
+      marker.bindPopup(
+        '<div style="min-width:180px;">' +
+        '<strong><i class="fas fa-user mr-1"></i>' + props.nombre + '</strong><br>' +
+        '<i class="fas fa-map-marker-alt mr-1 text-danger"></i>' + props.direccion + '<br>' +
+        '<i class="fas fa-city mr-1"></i>' + props.ciudad + '<br>' +
+        (props.empresa ? '<i class="fas fa-building mr-1"></i>' + props.empresa + '<br>' : '') +
+        (props.telefono ? '<i class="fas fa-phone mr-1"></i>' + props.telefono + '<br>' : '') +
+        '<div class="mt-2">' +
+        '<a href="/clientes/' + props.id + '/" class="btn btn-xs btn-info btn-sm mr-1"><i class="fas fa-eye"></i> Ver</a>' +
+        '<a href="https://waze.com/ul?ll=' + lat + ',' + lon + '&navigate=yes" target="_blank" class="btn btn-xs btn-primary btn-sm"><i class="fab fa-waze"></i> Waze</a>' +
+        '</div></div>'
+      );
+      markers.addLayer(marker);
+    });
+    map.addLayer(markers);
+    if (data.features.length > 0) {
+      map.fitBounds(markers.getBounds().pad(0.1));
+    }
+  })
+  .catch(err => console.error('Error cargando clientes:', err));
+</script>
+{% endblock %}

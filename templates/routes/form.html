@@ -1,0 +1,37 @@
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+{% block title %}{{ titulo }} – PADACI{% endblock %}
+{% block active_routes %}active{% endblock %}
+
+{% block page_heading %}
+<div class="d-sm-flex align-items-center justify-content-between mb-4">
+  <h1 class="h3 mb-0 text-gray-800"><i class="fas fa-route mr-2 text-primary"></i>{{ titulo }}</h1>
+  <a href="{% url 'routes:list' %}" class="btn btn-secondary btn-sm"><i class="fas fa-arrow-left mr-1"></i> Volver</a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-xl-8">
+    <div class="card shadow mb-4">
+      <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">{{ titulo }}</h6>
+      </div>
+      <div class="card-body">
+        <form method="post" enctype="multipart/form-data">
+          {% csrf_token %}
+          {{ form|crispy }}
+          <div class="alert alert-info mt-2">
+            <i class="fas fa-robot mr-1"></i>
+            <strong>IA Incluida:</strong> Sube una foto de la hoja de ruta del día y el sistema extraerá los nombres de los clientes
+            automáticamente usando OCR (EasyOCR) y luego optimizará la ruta con el algoritmo Nearest Neighbor.
+          </div>
+          <hr>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save mr-1"></i> Guardar Ruta</button>
+          <a href="{% url 'routes:list' %}" class="btn btn-secondary ml-2">Cancelar</a>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

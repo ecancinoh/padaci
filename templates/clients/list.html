@@ -1,0 +1,60 @@
+{% extends 'base.html' %}
+{% block title %}Clientes – PADACI{% endblock %}
+{% block active_clients %}active{% endblock %}
+
+{% block page_heading %}
+<div class="d-sm-flex align-items-center justify-content-between mb-4">
+  <h1 class="h3 mb-0 text-gray-800"><i class="fas fa-address-book mr-2 text-primary"></i>Clientes</h1>
+  <a href="{% url 'clients:create' %}" class="btn btn-primary btn-sm shadow-sm">
+    <i class="fas fa-plus mr-1"></i> Nuevo Cliente
+  </a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="card shadow mb-4">
+  <div class="card-header py-3">
+    <form method="get" class="form-inline">
+      <input type="text" name="q" value="{{ request.GET.q }}" class="form-control form-control-sm mr-2" placeholder="Buscar nombre, comuna...">
+      <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-search"></i></button>
+    </form>
+  </div>
+  <div class="card-body">
+    <div class="table-responsive">
+      <table class="table table-bordered table-hover table-sm">
+        <thead class="thead-light">
+          <tr>
+            <th>Nombre del Cliente</th><th>Comuna</th><th>Latitud</th><th>Longitud</th><th>Navegación</th><th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for c in clientes %}
+          <tr>
+            <td><strong>{{ c.nombre }}</strong></td>
+            <td>{{ c.comuna|default:"–" }}</td>
+            <td><code>{{ c.latitud|default:"–" }}</code></td>
+            <td><code>{{ c.longitud|default:"–" }}</code></td>
+            <td>
+              {% if c.tiene_coordenadas %}
+                <a href="{{ c.url_google_maps }}" target="_blank" class="btn btn-danger btn-sm" title="Google Maps"><i class="fas fa-map"></i></a>
+                <a href="{{ c.url_waze }}" target="_blank" class="btn btn-primary btn-sm" title="Waze"><i class="fas fa-route"></i></a>
+              {% else %}
+                <span class="badge badge-warning"><i class="fas fa-map-marker-alt mr-1"></i>Sin coords</span>
+              {% endif %}
+            </td>
+            <td>
+              <a href="{% url 'clients:detail' c.pk %}" class="btn btn-info btn-sm"><i class="fas fa-eye"></i></a>
+              <a href="{% url 'clients:update' c.pk %}" class="btn btn-warning btn-sm"><i class="fas fa-edit"></i></a>
+              <a href="{% url 'clients:delete' c.pk %}" class="btn btn-danger btn-sm"><i class="fas fa-trash"></i></a>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="6" class="text-center text-muted">No hay clientes registrados.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% include 'partials/pagination.html' with page_obj=page_obj %}
+  </div>
+</div>
+{% endblock %}

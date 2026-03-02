@@ -1,0 +1,351 @@
+{% extends 'base.html' %}
+{% block title %}Navegación – Ruta {{ ruta.fecha }} – PADACI{% endblock %}
+{% block active_routes %}active{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+  body { overflow-x: hidden; }
+  #navWrapper { display: flex; flex-direction: column; height: calc(100vh - 70px); }
+  #mapNav { flex: 0 0 52%; min-height: 280px; position: relative; z-index: 1; }
+  #panelParadas { flex: 1 1 auto; overflow-y: auto; background: #f8f9fc; border-top: 3px solid #4e73df; }
+  .parada-item { background: #fff; border-left: 5px solid #4e73df; border-radius: .35rem; margin: .5rem .75rem; padding: .6rem .75rem; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+  .parada-item.entregado { border-left-color: #1cc88a; opacity: .75; }
+  .parada-item.fallido   { border-left-color: #e74a3b; opacity: .75; }
+  .parada-item.en_ruta   { border-left-color: #4e73df; }
+  .parada-num { width:28px;height:28px;border-radius:50%;background:#4e73df;color:#fff;
+                display:inline-flex;align-items:center;justify-content:center;font-weight:bold;font-size:.82rem;flex-shrink:0; }
+  .parada-num.entregado { background:#1cc88a; }
+  .parada-num.fallido   { background:#e74a3b; }
+  #toolbar { background: linear-gradient(135deg,#4e73df,#224abe); color:#fff; padding: .6rem 1rem; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:.4rem; }
+  #toolbar .ruta-info { font-size:.85rem; line-height:1.3; }
+  .btn-geo  { background:#fff; color:#4e73df; border:none; border-radius:2rem; padding:.4rem .9rem; font-weight:600; font-size:.82rem; cursor:pointer; white-space:nowrap; }
+  .btn-geo:hover { background:#eaecf4; }
+  #geoStatus { font-size:.75rem; opacity:.85; }
+  .nav-btns a { font-size:.75rem; padding: .25rem .5rem; }
+  .estado-btns button { font-size:.75rem; padding:.25rem .55rem; border-radius:.25rem; border:none; cursor:pointer; font-weight:600; }
+  .btn-entregado { background:#1cc88a; color:#fff; }
+  .btn-fallido   { background:#e74a3b; color:#fff; }
+  .btn-pendiente { background:#f6c23e; color:#333; }
+  .btn-en_ruta   { background:#4e73df; color:#fff; }
+  #statsBar { background:#fff; border-bottom:1px solid #e3e6f0; padding:.35rem 1rem; font-size:.8rem; display:flex; gap:1rem; }
+  #resumenStats span { font-weight:700; }
+  .spinner-sm { width:16px;height:16px;border:2px solid #fff;border-top-color:transparent;border-radius:50%;display:inline-block;animation:spin .6s linear infinite;vertical-align:middle; }
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .marker-pos { background:#e74a3b;color:#fff;border-radius:50%;width:18px;height:18px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:bold;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4); }
+</style>
+{% endblock %}
+
+{% block page_heading %}
+<div class="d-sm-flex align-items-center justify-content-between mb-3">
+  <h1 class="h4 mb-0 text-gray-800">
+    <i class="fas fa-map-marked-alt mr-2 text-primary"></i>Navegación – {{ ruta.fecha }}
+    <span class="badge badge-{% if ruta.estado == 'completada' %}success{% elif ruta.estado == 'en_curso' %}primary{% else %}warning{% endif %} ml-1">{{ ruta.get_estado_display }}</span>
+  </h1>
+  <a href="{% url 'routes:detail' ruta.pk %}" class="btn btn-secondary btn-sm"><i class="fas fa-arrow-left"></i> Volver</a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div id="navWrapper">
+
+  <!-- Toolbar -->
+  <div id="toolbar">
+    <div class="ruta-info">
+      <strong>{{ ruta.conductor.get_full_name }}</strong><br>
+      <span id="geoStatus"><i class="fas fa-location-arrow mr-1"></i>Sin ubicación</span>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+      <button class="btn-geo" onclick="obtenerUbicacion()">
+        <i class="fas fa-crosshairs mr-1"></i>Mi ubicación
+      </button>
+      <button class="btn-geo" id="btnReopt" onclick="reoptimizar()" disabled>
+        <i class="fas fa-route mr-1"></i><span id="txtReopt">Reoptimizar ruta</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Stats bar -->
+  <div id="statsBar">
+    <div id="resumenStats">
+      Cargando paradas…
+    </div>
+  </div>
+
+  <!-- Mapa -->
+  <div id="mapNav"></div>
+
+  <!-- Panel de paradas -->
+  <div id="panelParadas">
+    <div id="listaParadas" class="pb-3">
+      {% if paradas %}
+        {% for p in paradas %}
+        <div class="parada-item {{ p.entrega.estado }}" id="parada-{{ p.entrega.pk }}" data-orden="{{ p.orden }}">
+          <div class="d-flex align-items-start">
+            <span class="parada-num {{ p.entrega.estado }} mr-2 mt-1">{{ p.orden }}</span>
+            <div class="flex-grow-1">
+              <div class="font-weight-bold" style="font-size:.9rem;">{{ p.entrega.cliente.nombre }}</div>
+              <div class="text-muted" style="font-size:.78rem;"><i class="fas fa-map-marker-alt mr-1"></i>{{ p.entrega.cliente.comuna|default:"–" }}</div>
+              <div class="d-flex align-items-center mt-1 flex-wrap" style="gap:.3rem;">
+                <span class="badge badge-{% if p.entrega.estado == 'entregado' %}success{% elif p.entrega.estado == 'fallido' %}danger{% elif p.entrega.estado == 'en_ruta' %}primary{% else %}warning{% endif %}" id="badge-{{ p.entrega.pk }}">
+                  {{ p.entrega.get_estado_display }}
+                </span>
+                <!-- Navegación -->
+                <div class="nav-btns">
+                  {% if p.entrega.cliente.tiene_coordenadas %}
+                    <a href="{{ p.entrega.cliente.url_waze }}" target="_blank" class="btn btn-info btn-sm" title="Waze"><i class="fas fa-route"></i></a>
+                    <a href="{{ p.entrega.cliente.url_google_maps }}" target="_blank" class="btn btn-outline-danger btn-sm" title="Google Maps"><i class="fas fa-map"></i></a>
+                  {% endif %}
+                </div>
+              </div>
+              <!-- Cambio de estado rápido -->
+              <div class="estado-btns mt-2 d-flex flex-wrap" style="gap:.3rem;">
+                <button class="btn-en_ruta"    onclick="cambiarEstado({{ p.entrega.pk }}, 'en_ruta')"><i class="fas fa-truck"></i> En Ruta</button>
+                <button class="btn-entregado"  onclick="cambiarEstado({{ p.entrega.pk }}, 'entregado')"><i class="fas fa-check"></i> Entregado</button>
+                <button class="btn-fallido"    onclick="cambiarEstado({{ p.entrega.pk }}, 'fallido')"><i class="fas fa-times"></i> Fallido</button>
+                <button class="btn-pendiente"  onclick="cambiarEstado({{ p.entrega.pk }}, 'pendiente')"><i class="fas fa-clock"></i> Pendiente</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      {% else %}
+        <div class="text-center text-muted py-5">
+          <i class="fas fa-route fa-3x text-gray-300 mb-3 d-block"></i>
+          No hay paradas en esta ruta aún.
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+var CSRF     = '{{ csrf_token }}';
+var URL_REOPT  = '{% url "routes:reoptimizar_posicion" ruta.pk %}';
+var URL_ESTADO = '{% url "routes:actualizar_parada" ruta.pk %}';
+
+var miLat = null, miLon = null;
+var miMarker = null;
+var paradasData = [];
+
+// ── MAPA ──────────────────────────────────────────────────────────────────────
+var map = L.map('mapNav').setView([-34.17, -70.73], 10);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© OpenStreetMap'
+}).addTo(map);
+
+var markersLayer = L.layerGroup().addTo(map);
+var polyline = null;
+
+// Cargar paradas iniciales desde el DOM
+function cargarParadasIniciales() {
+  var items = document.querySelectorAll('.parada-item[data-orden]');
+  paradasData = [];
+  items.forEach(function(el) {
+    var eid = el.id.replace('parada-', '');
+    var nombre = el.querySelector('.font-weight-bold') ? el.querySelector('.font-weight-bold').textContent.trim() : '?';
+    // Buscar coordenadas de los links waze
+    var wazeLink = el.querySelector('a[href*="waze"]');
+    var lat = null, lon = null;
+    if (wazeLink) {
+      var m = wazeLink.href.match(/ll=([\d.-]+),([\d.-]+)/);
+      if (m) { lat = parseFloat(m[1]); lon = parseFloat(m[2]); }
+    }
+    var badgeEl = document.getElementById('badge-' + eid);
+    var estado = badgeEl ? badgeEl.className.match(/badge-(\w+)/)?.[1] : 'warning';
+    paradasData.push({
+      orden: parseInt(el.dataset.orden),
+      entrega_id: parseInt(eid),
+      cliente: nombre,
+      lat: lat,
+      lon: lon,
+      estado: el.classList.contains('entregado') ? 'entregado' :
+              el.classList.contains('fallido') ? 'fallido' :
+              el.classList.contains('en_ruta') ? 'en_ruta' : 'pendiente',
+    });
+  });
+  dibujarMapa();
+  actualizarStats();
+}
+
+function dibujarMapa() {
+  markersLayer.clearLayers();
+  if (polyline) { map.removeLayer(polyline); polyline = null; }
+
+  var ll = [];
+  paradasData.forEach(function(p) {
+    if (!p.lat || !p.lon) return;
+    var color = p.estado === 'entregado' ? '#1cc88a' : p.estado === 'fallido' ? '#e74a3b' : '#4e73df';
+    var icon = L.divIcon({
+      className: '',
+      iconSize: [30, 30],
+      iconAnchor: [15, 15],
+      html: '<div style="background:' + color + ';color:#fff;border-radius:50%;width:30px;height:30px;' +
+            'display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:12px;' +
+            'border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.4)">' + p.orden + '</div>'
+    });
+    var marker = L.marker([p.lat, p.lon], {icon: icon}).addTo(markersLayer);
+    marker.bindPopup('<strong>' + escHtml(p.cliente) + '</strong><br><small>' + p.estado + '</small>');
+    ll.push([p.lat, p.lon]);
+  });
+
+  if (ll.length > 1) {
+    polyline = L.polyline(ll, {color: '#4e73df', weight: 3, dashArray: '8,5'}).addTo(map);
+    map.fitBounds(polyline.getBounds().pad(0.15));
+  } else if (ll.length === 1) {
+    map.setView(ll[0], 13);
+  }
+}
+
+function actualizarStats() {
+  var total = paradasData.length;
+  var entregadas = paradasData.filter(function(p){ return p.estado === 'entregado'; }).length;
+  var pendientes = paradasData.filter(function(p){ return p.estado !== 'entregado' && p.estado !== 'fallido'; }).length;
+  var fallidas  = paradasData.filter(function(p){ return p.estado === 'fallido'; }).length;
+  document.getElementById('resumenStats').innerHTML =
+    'Total: <span>' + total + '</span> &nbsp;|&nbsp; ' +
+    '<span style="color:#1cc88a">✓ ' + entregadas + '</span> entregadas &nbsp;|&nbsp; ' +
+    '<span style="color:#f6c23e">⏳ ' + pendientes + '</span> pendientes &nbsp;|&nbsp; ' +
+    '<span style="color:#e74a3b">✗ ' + fallidas + '</span> fallidas';
+}
+
+// ── GEOLOCALIZACIÓN ───────────────────────────────────────────────────────────
+function obtenerUbicacion() {
+  if (!navigator.geolocation) {
+    alert('Tu navegador no soporta geolocalización.'); return;
+  }
+  document.getElementById('geoStatus').innerHTML = '<span class="spinner-sm"></span> Obteniendo ubicación…';
+  navigator.geolocation.getCurrentPosition(
+    function(pos) {
+      miLat = pos.coords.latitude;
+      miLon = pos.coords.longitude;
+      document.getElementById('geoStatus').innerHTML =
+        '<i class="fas fa-location-arrow mr-1"></i>' + miLat.toFixed(5) + ', ' + miLon.toFixed(5);
+      document.getElementById('btnReopt').disabled = false;
+
+      // Marcador posición actual
+      if (miMarker) map.removeLayer(miMarker);
+      var iconPos = L.divIcon({
+        className: '',
+        iconSize: [20, 20],
+        iconAnchor: [10, 10],
+        html: '<div style="background:#e74a3b;border-radius:50%;width:20px;height:20px;border:3px solid #fff;box-shadow:0 0 0 3px rgba(231,74,59,.4)"></div>'
+      });
+      miMarker = L.marker([miLat, miLon], {icon: iconPos}).addTo(map)
+                  .bindPopup('<b>Tu posición actual</b>');
+      map.setView([miLat, miLon], 13);
+    },
+    function(err) {
+      document.getElementById('geoStatus').innerHTML = '<i class="fas fa-exclamation-triangle mr-1"></i>Error: ' + err.message;
+    },
+    {enableHighAccuracy: true, timeout: 15000}
+  );
+}
+
+// ── RE-OPTIMIZAR DESDE POSICIÓN ────────────────────────────────────────────────
+function reoptimizar() {
+  if (!miLat || !miLon) { alert('Primero obtén tu ubicación.'); return; }
+  document.getElementById('txtReopt').innerHTML = '<span class="spinner-sm"></span> Optimizando…';
+  document.getElementById('btnReopt').disabled = true;
+
+  fetch(URL_REOPT, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json', 'X-CSRFToken': CSRF},
+    body: JSON.stringify({lat: miLat, lon: miLon})
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(data) {
+    document.getElementById('txtReopt').innerHTML = '<i class="fas fa-route mr-1"></i>Reoptimizar ruta';
+    document.getElementById('btnReopt').disabled = false;
+    if (data.error) { alert('Error: ' + data.error); return; }
+    if (data.mensaje) { alert(data.mensaje); return; }
+
+    // Reconstruir paradasData y DOM desde la respuesta
+    paradasData = data.paradas;
+    renderizarListaParadas(data.paradas);
+    dibujarMapa();
+    actualizarStats();
+  })
+  .catch(function(e) {
+    document.getElementById('txtReopt').innerHTML = '<i class="fas fa-route mr-1"></i>Reoptimizar ruta';
+    document.getElementById('btnReopt').disabled = false;
+    alert('Error de conexión: ' + e.message);
+  });
+}
+
+// ── RE-RENDER LISTA PARADAS ───────────────────────────────────────────────────
+function renderizarListaParadas(paradas) {
+  var html = '';
+  paradas.forEach(function(p) {
+    var estadoCss = p.estado === 'entregado' ? 'entregado' : p.estado === 'fallido' ? 'fallido' : p.estado === 'en_ruta' ? 'en_ruta' : '';
+    var badgeCss  = p.estado === 'entregado' ? 'success' : p.estado === 'fallido' ? 'danger' : p.estado === 'en_ruta' ? 'primary' : 'warning';
+    var navBtns = '';
+    if (p.waze)  navBtns += '<a href="' + p.waze  + '" target="_blank" class="btn btn-info btn-sm nav-btns" style="font-size:.75rem;padding:.25rem .5rem" title="Waze"><i class="fas fa-route"></i></a>';
+    if (p.gmaps) navBtns += '<a href="' + p.gmaps + '" target="_blank" class="btn btn-outline-danger btn-sm nav-btns" style="font-size:.75rem;padding:.25rem .5rem" title="Google Maps"><i class="fas fa-map"></i></a>';
+
+    html += '<div class="parada-item ' + estadoCss + '" id="parada-' + p.entrega_id + '" data-orden="' + p.orden + '">' +
+      '<div class="d-flex align-items-start">' +
+        '<span class="parada-num ' + estadoCss + ' mr-2 mt-1">' + p.orden + '</span>' +
+        '<div class="flex-grow-1">' +
+          '<div class="font-weight-bold" style="font-size:.9rem;">' + escHtml(p.cliente) + '</div>' +
+          '<div class="text-muted" style="font-size:.78rem;"><i class="fas fa-map-marker-alt mr-1"></i>' + escHtml(p.comuna) + '</div>' +
+          '<div class="d-flex align-items-center mt-1 flex-wrap" style="gap:.3rem;">' +
+            '<span class="badge badge-' + badgeCss + '" id="badge-' + p.entrega_id + '">' + escHtml(p.estado_display) + '</span>' +
+            '<div class="nav-btns">' + navBtns + '</div>' +
+          '</div>' +
+          '<div class="estado-btns mt-2 d-flex flex-wrap" style="gap:.3rem;">' +
+            '<button class="btn-en_ruta"   onclick="cambiarEstado(' + p.entrega_id + ',\'en_ruta\')"><i class="fas fa-truck"></i> En Ruta</button>' +
+            '<button class="btn-entregado" onclick="cambiarEstado(' + p.entrega_id + ',\'entregado\')"><i class="fas fa-check"></i> Entregado</button>' +
+            '<button class="btn-fallido"   onclick="cambiarEstado(' + p.entrega_id + ',\'fallido\')"><i class="fas fa-times"></i> Fallido</button>' +
+            '<button class="btn-pendiente" onclick="cambiarEstado(' + p.entrega_id + ',\'pendiente\')"><i class="fas fa-clock"></i> Pendiente</button>' +
+          '</div>' +
+        '</div>' +
+      '</div></div>';
+  });
+  document.getElementById('listaParadas').innerHTML = html || '<div class="text-center text-muted py-4">Sin paradas pendientes.</div>';
+}
+
+// ── CAMBIAR ESTADO ────────────────────────────────────────────────────────────
+function cambiarEstado(entregaId, nuevoEstado) {
+  fetch(URL_ESTADO, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json', 'X-CSRFToken': CSRF},
+    body: JSON.stringify({entrega_id: entregaId, estado: nuevoEstado})
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(data) {
+    if (!data.ok) { alert('Error al actualizar estado'); return; }
+
+    // Actualizar badge
+    var badge = document.getElementById('badge-' + entregaId);
+    var badgeCss = nuevoEstado === 'entregado' ? 'success' : nuevoEstado === 'fallido' ? 'danger' : nuevoEstado === 'en_ruta' ? 'primary' : 'warning';
+    if (badge) {
+      badge.className = 'badge badge-' + badgeCss;
+      badge.textContent = data.estado_display;
+    }
+    // Actualizar clase de la tarjeta
+    var card = document.getElementById('parada-' + entregaId);
+    if (card) {
+      card.classList.remove('entregado', 'fallido', 'en_ruta');
+      if (nuevoEstado === 'entregado' || nuevoEstado === 'fallido') card.classList.add(nuevoEstado);
+      var num = card.querySelector('.parada-num');
+      if (num) { num.classList.remove('entregado','fallido','en_ruta'); if(nuevoEstado !== 'pendiente') num.classList.add(nuevoEstado); }
+    }
+    // Actualizar en paradasData
+    paradasData.forEach(function(p){ if(p.entrega_id === entregaId) { p.estado = nuevoEstado; } });
+    dibujarMapa();
+    actualizarStats();
+  })
+  .catch(function(e){ alert('Error: ' + e.message); });
+}
+
+function escHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// Inicializar
+cargarParadasIniciales();
+</script>
+{% endblock %}

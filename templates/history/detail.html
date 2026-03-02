@@ -1,0 +1,54 @@
+{% extends 'base.html' %}
+{% block title %}Historial {{ historial.fecha }} – PADACI{% endblock %}
+{% block active_history %}active{% endblock %}
+
+{% block page_heading %}
+<div class="d-sm-flex align-items-center justify-content-between mb-4">
+  <h1 class="h3 mb-0 text-gray-800"><i class="fas fa-history mr-2 text-primary"></i>Historial del {{ historial.fecha }}</h1>
+  <a href="{% url 'history:list' %}" class="btn btn-secondary btn-sm"><i class="fas fa-arrow-left"></i> Volver</a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+  <div class="col-md-3"><div class="card border-left-primary shadow py-2"><div class="card-body"><div class="text-xs font-weight-bold text-primary text-uppercase">Total</div><div class="h4 font-weight-bold">{{ historial.total_entregas }}</div></div></div></div>
+  <div class="col-md-3"><div class="card border-left-success shadow py-2"><div class="card-body"><div class="text-xs font-weight-bold text-success text-uppercase">Entregadas</div><div class="h4 font-weight-bold">{{ historial.entregadas }}</div></div></div></div>
+  <div class="col-md-3"><div class="card border-left-danger shadow py-2"><div class="card-body"><div class="text-xs font-weight-bold text-danger text-uppercase">Fallidas</div><div class="h4 font-weight-bold">{{ historial.fallidas }}</div></div></div></div>
+  <div class="col-md-3"><div class="card border-left-warning shadow py-2"><div class="card-body"><div class="text-xs font-weight-bold text-warning text-uppercase">% Éxito</div><div class="h4 font-weight-bold">{{ historial.porcentaje_exito }}%</div></div></div></div>
+</div>
+
+{% if historial.observacion %}
+<div class="alert alert-info"><i class="fas fa-sticky-note mr-1"></i> {{ historial.observacion }}</div>
+{% endif %}
+
+<div class="card shadow mb-4">
+  <div class="card-header py-3"><h6 class="m-0 font-weight-bold text-primary">Detalle de Entregas del Día</h6></div>
+  <div class="card-body">
+    <div class="table-responsive">
+      <table class="table table-bordered table-sm">
+        <thead class="thead-light">
+          <tr>
+            <th>Cliente</th><th>Empresa</th><th>Estado Final</th><th>Hora Reg.</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for d in detalles %}
+          <tr>
+            <td>{{ d.entrega.cliente }}</td>
+            <td>{{ d.entrega.empresa.nombre }}</td>
+            <td>
+              <span class="badge badge-{% if d.estado_final == 'entregado' %}success{% elif d.estado_final == 'fallido' %}danger{% else %}warning{% endif %}">
+                {{ d.estado_final }}
+              </span>
+            </td>
+            <td>{{ d.hora_registro }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="5" class="text-center text-muted">Sin detalles.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

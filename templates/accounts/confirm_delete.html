@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+{% block title %}Confirmar Eliminación – PADACI{% endblock %}
+
+{% block page_heading %}
+<div class="d-sm-flex align-items-center justify-content-between mb-4">
+  <h1 class="h3 mb-0 text-gray-800"><i class="fas fa-trash mr-2 text-danger"></i>Eliminar Registro</h1>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-6">
+    <div class="card border-danger shadow mb-4">
+      <div class="card-header bg-danger text-white"><h6 class="m-0 font-weight-bold">Confirmar Eliminación</h6></div>
+      <div class="card-body text-center">
+        <p class="lead">¿Estás seguro de que deseas eliminar este registro?</p>
+        <p class="text-muted">Esta acción no se puede deshacer.</p>
+        <form method="post">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-danger mr-2"><i class="fas fa-trash mr-1"></i> Sí, eliminar</button>
+          <a href="javascript:history.back()" class="btn btn-secondary">Cancelar</a>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

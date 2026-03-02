@@ -1,0 +1,53 @@
+{% extends 'base.html' %}
+{% block title %}Usuarios – PADACI{% endblock %}
+{% block active_accounts %}active{% endblock %}
+
+{% block page_heading %}
+<div class="d-sm-flex align-items-center justify-content-between mb-4">
+  <h1 class="h3 mb-0 text-gray-800"><i class="fas fa-users mr-2 text-primary"></i>Usuarios</h1>
+  <a href="{% url 'accounts:create' %}" class="btn btn-primary btn-sm shadow-sm">
+    <i class="fas fa-plus mr-1"></i> Nuevo Usuario
+  </a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="card shadow mb-4">
+  <div class="card-header py-3">
+    <form method="get" class="form-inline">
+      <input type="text" name="q" value="{{ request.GET.q }}" class="form-control form-control-sm mr-2" placeholder="Buscar usuario...">
+      <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-search"></i></button>
+    </form>
+  </div>
+  <div class="card-body">
+    <div class="table-responsive">
+      <table class="table table-bordered table-hover table-sm">
+        <thead class="thead-light">
+          <tr>
+            <th>Usuario</th><th>Nombre Completo</th><th>Correo</th><th>Rol</th><th>Activo</th><th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for u in usuarios %}
+          <tr>
+            <td>{{ u.username }}</td>
+            <td>{{ u.get_full_name }}</td>
+            <td>{{ u.email }}</td>
+            <td><span class="badge badge-info">{{ u.get_rol_display }}</span></td>
+            <td>{% if u.activo %}<span class="badge badge-success">Sí</span>{% else %}<span class="badge badge-danger">No</span>{% endif %}</td>
+            <td>
+              <a href="{% url 'accounts:detail' u.pk %}" class="btn btn-info btn-sm"><i class="fas fa-eye"></i></a>
+              <a href="{% url 'accounts:update' u.pk %}" class="btn btn-warning btn-sm"><i class="fas fa-edit"></i></a>
+              <a href="{% url 'accounts:delete' u.pk %}" class="btn btn-danger btn-sm"><i class="fas fa-trash"></i></a>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="6" class="text-center text-muted">No hay usuarios registrados.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% include 'partials/pagination.html' with page_obj=page_obj %}
+  </div>
+</div>
+{% endblock %}

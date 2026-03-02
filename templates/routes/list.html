@@ -1,0 +1,66 @@
+{% extends 'base.html' %}
+{% block title %}Rutas del Día – PADACI{% endblock %}
+{% block active_routes %}active{% endblock %}
+
+{% block page_heading %}
+<div class="d-sm-flex align-items-center justify-content-between mb-4">
+  <h1 class="h3 mb-0 text-gray-800"><i class="fas fa-route mr-2 text-primary"></i>Ruta del Día</h1>
+  <a href="{% url 'routes:create' %}" class="btn btn-primary btn-sm shadow-sm">
+    <i class="fas fa-plus mr-1"></i> Nueva Ruta
+  </a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="card shadow mb-4">
+  <div class="card-header py-3">
+    <form method="get" class="form-inline">
+      <label class="mr-1">Fecha:</label>
+      <input type="date" name="fecha" value="{{ request.GET.fecha }}" class="form-control form-control-sm mr-2">
+      <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-filter"></i></button>
+    </form>
+  </div>
+  <div class="card-body">
+    <div class="table-responsive">
+      <table class="table table-bordered table-hover table-sm">
+        <thead class="thead-light">
+          <tr>
+            <th>Fecha</th><th>Empresa</th><th>Conductor</th><th>Estado</th><th>Paradas</th><th>Foto Ruta</th><th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in rutas %}
+          <tr>
+            <td><strong>{{ r.fecha }}</strong></td>
+            <td>{{ r.empresa.nombre|default:"–" }}</td>
+            <td>{{ r.conductor.get_full_name }}</td>
+            <td>
+              <span class="badge badge-{% if r.estado == 'completada' %}success{% elif r.estado == 'en_curso' %}primary{% elif r.estado == 'planificada' %}warning{% else %}secondary{% endif %}">
+                {{ r.get_estado_display }}
+              </span>
+            </td>
+            <td><span class="badge badge-info">{{ r.total_paradas }}</span></td>
+            <td>
+              {% if r.foto_hoja_ruta %}
+                <span class="badge badge-success"><i class="fas fa-camera"></i> OK</span>
+              {% else %}
+                <span class="badge badge-secondary">Sin foto</span>
+              {% endif %}
+            </td>
+            <td>
+              <a href="{% url 'routes:detail' r.pk %}" class="btn btn-info btn-sm" title="Ver detalle"><i class="fas fa-eye"></i></a>
+              <a href="{% url 'routes:navegacion' r.pk %}" class="btn btn-success btn-sm" title="Navegar"><i class="fas fa-map-marked-alt"></i></a>
+              <a href="{% url 'routes:update' r.pk %}" class="btn btn-warning btn-sm" title="Editar"><i class="fas fa-edit"></i></a>
+              <a href="{% url 'routes:delete' r.pk %}" class="btn btn-danger btn-sm" title="Eliminar"><i class="fas fa-trash"></i></a>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="7" class="text-center text-muted">No hay rutas registradas.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% include 'partials/pagination.html' with page_obj=page_obj %}
+  </div>
+</div>
+{% endblock %}

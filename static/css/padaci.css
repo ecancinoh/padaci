@@ -1,0 +1,64 @@
+/* PADACI – Custom CSS extending SB Admin 2 */
+
+/* ── Cards ────────────────────────────────────────────────── */
+.card {
+  border-radius: 0.5rem;
+}
+
+/* ── Badge sizes ─────────────────────────────────────────── */
+.badge-lg {
+  font-size: 0.9rem;
+  padding: 0.4em 0.7em;
+}
+
+/* ── Table improvements ──────────────────────────────────── */
+.table-sm td, .table-sm th {
+  vertical-align: middle !important;
+}
+
+/* ── Sidebar brand custom ────────────────────────────────── */
+.sidebar-brand-text {
+  font-size: 1.3rem;
+  font-weight: 900;
+  letter-spacing: 0.15rem;
+}
+
+/* ── Map full height helper ──────────────────────────────── */
+.map-full {
+  height: calc(100vh - 280px);
+  min-height: 400px;
+}
+
+/* ── Waze button ─────────────────────────────────────────── */
+.btn-waze {
+  background-color: #33CCFF;
+  color: #fff;
+  border: none;
+}
+.btn-waze:hover {
+  background-color: #00aaee;
+  color: #fff;
+}
+
+/* ── Progress bar labels ─────────────────────────────────── */
+.progress-bar {
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+/* ── Login page adjustment ───────────────────────────────── */
+body.bg-gradient-primary {
+  min-height: 100vh;
+}
+
+/* ── OCR spinner overlay ─────────────────────────────────── */
+.ocr-spinner-overlay {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(255,255,255,0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.35rem;
+  z-index: 100;
+}

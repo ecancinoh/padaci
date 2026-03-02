@@ -1,0 +1,61 @@
+{% extends 'base.html' %}
+{% block title %}Empresas – PADACI{% endblock %}
+{% block active_companies %}active{% endblock %}
+
+{% block page_heading %}
+<div class="d-sm-flex align-items-center justify-content-between mb-4">
+  <h1 class="h3 mb-0 text-gray-800"><i class="fas fa-building mr-2 text-primary"></i>Empresas Distribuidoras</h1>
+  <a href="{% url 'companies:create' %}" class="btn btn-primary btn-sm shadow-sm">
+    <i class="fas fa-plus mr-1"></i> Nueva Empresa
+  </a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="card shadow mb-4">
+  <div class="card-header py-3">
+    <form method="get" class="form-inline">
+      <input type="text" name="q" value="{{ request.GET.q }}" class="form-control form-control-sm mr-2" placeholder="Buscar empresa o RUT...">
+      <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-search"></i></button>
+    </form>
+  </div>
+  <div class="card-body">
+    <div class="table-responsive">
+      <table class="table table-bordered table-hover table-sm">
+        <thead class="thead-light">
+          <tr>
+            <th>Logo</th><th>Nombre</th><th>RUT</th><th>Contacto</th><th>Teléfono</th><th>Correo</th><th>Activa</th><th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for e in empresas %}
+          <tr>
+            <td>
+              {% if e.logo %}
+                <img src="{{ e.logo.url }}" style="width:40px;height:40px;object-fit:contain;" alt="">
+              {% else %}
+                <span class="text-muted">–</span>
+              {% endif %}
+            </td>
+            <td><strong>{{ e.nombre }}</strong><br><small class="text-muted">{{ e.razon_social }}</small></td>
+            <td>{{ e.rut }}</td>
+            <td>{{ e.contacto|default:"–" }}</td>
+            <td>{{ e.telefono }}</td>
+            <td>{{ e.email }}</td>
+            <td>{% if e.activa %}<span class="badge badge-success">Sí</span>{% else %}<span class="badge badge-danger">No</span>{% endif %}</td>
+            <td>
+              <a href="{% url 'companies:detail' e.pk %}" class="btn btn-info btn-sm"><i class="fas fa-eye"></i></a>
+              <a href="{% url 'companies:update' e.pk %}" class="btn btn-warning btn-sm"><i class="fas fa-edit"></i></a>
+              <a href="{% url 'companies:delete' e.pk %}" class="btn btn-danger btn-sm"><i class="fas fa-trash"></i></a>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="8" class="text-center text-muted">No hay empresas registradas.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% include 'partials/pagination.html' with page_obj=page_obj %}
+  </div>
+</div>
+{% endblock %}
