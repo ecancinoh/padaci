@@ -1,7 +1,7 @@
 ---
 deployment:
   tasks:
-    - export DEPLOYPATH=/home/padacicl/padaci
+    - export DEPLOYPATH=/home/padacicl/repositories/padaci
     - export VENV=/home/padacicl/virtualenv/padaci/3.11/bin
     - $VENV/pip install --upgrade pip
     - $VENV/pip install -r $DEPLOYPATH/requirements.txt
