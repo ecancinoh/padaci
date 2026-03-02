@@ -18,11 +18,15 @@ djangorestframework==3.15.1
 # Leaflet handled via CDN in templates
 folium==0.16.0
 
-# ── OCR (AI – free / open-source) ────────────────────────────
-easyocr==1.7.1
+# ── OCR (Google Gemini AI) ────────────────────────────────────────────────────
+google-genai==1.10.0
+ftfy==6.2.3
 
 # ── Route optimisation (Google OR-Tools – free) ──────────────
 ortools==9.9.3963
+
+# ── Static files (production) ─────────────────────────────────
+whitenoise==6.6.0
 
 # ── Utilities ────────────────────────────────────────────────
 django-tables2==2.7.0
