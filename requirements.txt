@@ -16,14 +16,10 @@ djangorestframework==3.15.1
 
 # ── Maps ─────────────────────────────────────────────────────
 # Leaflet handled via CDN in templates
-folium==0.16.0
 
 # ── OCR (Google Gemini AI) ────────────────────────────────────────────────────
 google-genai==1.10.0
 ftfy==6.2.3
-
-# ── Route optimisation (Google OR-Tools – free) ──────────────
-ortools==9.9.3963
 
 # ── Static files (production) ─────────────────────────────────
 whitenoise==6.6.0
@@ -32,5 +28,3 @@ whitenoise==6.6.0
 django-tables2==2.7.0
 django-filter==23.5
 django-import-export==3.3.7
-whitenoise==6.6.0
-gunicorn==21.2.0
