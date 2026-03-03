@@ -1,6 +1,5 @@
 venv/
 __pycache__/
-passenger_wsgi.py
 *.pyc
 *.pyo
 *.pyd
