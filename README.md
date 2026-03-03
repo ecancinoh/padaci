@@ -86,6 +86,13 @@ DB_USER=root
 DB_PASSWORD=tu_password_mysql
 DB_HOST=127.0.0.1
 DB_PORT=3306
+
+# Seguridad producción (recomendado)
+CSRF_TRUSTED_ORIGINS=https://padaci.cl,https://www.padaci.cl
+SECURE_SSL_REDIRECT=True
+SECURE_HSTS_SECONDS=31536000
+SECURE_HSTS_INCLUDE_SUBDOMAINS=True
+SECURE_HSTS_PRELOAD=True
 ```
 
 ### 5. Aplicar migraciones
