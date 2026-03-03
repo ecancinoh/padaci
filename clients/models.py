@@ -31,6 +31,7 @@ class Cliente(models.Model):
     longitud = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True, verbose_name='Longitud')
 
     notas = models.TextField(blank=True, null=True, verbose_name='Notas')
+    observaciones = models.TextField(blank=True, default='', verbose_name='Observaciones', help_text='Indicaciones especiales de entrega, acceso, horarios, etc.')
     activo = models.BooleanField(default=True, verbose_name='Activo')
     fecha_creacion = models.DateTimeField(auto_now_add=True)
     fecha_actualizacion = models.DateTimeField(auto_now=True)

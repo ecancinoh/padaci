@@ -29,6 +29,13 @@ class ClienteCreateView(LoginRequiredMixin, CreateView):
     template_name = 'clients/form.html'
     success_url = reverse_lazy('clients:list')
 
+    def get_initial(self):
+        initial = super().get_initial()
+        nombre = self.request.GET.get('nombre', '').strip()
+        if nombre:
+            initial['nombre'] = nombre
+        return initial
+
     def form_valid(self, form):
         messages.success(self.request, 'Cliente creado exitosamente.')
         return super().form_valid(form)

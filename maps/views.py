@@ -30,6 +30,7 @@ def clientes_geojson(request):
                 'ciudad': c.ciudad,
                 'telefono': c.telefono or '',
                 'empresa': str(c.empresa) if c.empresa else '',
+                'observaciones': c.observaciones or '',
             },
         })
     return JsonResponse({'type': 'FeatureCollection', 'features': features})

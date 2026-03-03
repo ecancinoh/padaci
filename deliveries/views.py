@@ -83,6 +83,22 @@ class EntregaDetailView(LoginRequiredMixin, DetailView):
 
 
 @login_required
+def eliminar_masiva(request):
+    """Elimina múltiples entregas seleccionadas vía POST."""
+    if request.method != 'POST':
+        return redirect('deliveries:list')
+    ids = request.POST.getlist('ids')
+    if ids:
+        qs = Entrega.objects.filter(pk__in=ids)
+        total = qs.count()
+        qs.delete()
+        messages.success(request, f'{total} entrega(s) eliminada(s) correctamente.')
+    else:
+        messages.warning(request, 'No se seleccionó ninguna entrega.')
+    return redirect('deliveries:list')
+
+
+@login_required
 def actualizar_estado(request, pk):
     """Vista rápida para actualizar el estado de una entrega desde móvil/conductor."""
     entrega = get_object_or_404(Entrega, pk=pk)

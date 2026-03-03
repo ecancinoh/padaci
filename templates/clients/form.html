@@ -101,6 +101,17 @@
             Ingresa latitud y longitud para ver los links de navegación.
             Obtén las coordenadas haciendo clic derecho en <a href="https://maps.google.com" target="_blank">Google Maps</a>.
           </div>
+
+          <!-- Observaciones -->
+          <div class="form-group mt-3">
+            <label for="{{ form.observaciones.id_for_label }}" class="font-weight-bold">
+              <i class="fas fa-sticky-note mr-1 text-warning"></i> Observaciones
+            </label>
+            {{ form.observaciones }}
+            <small class="form-text text-muted">{{ form.observaciones.help_text }}</small>
+            {% if form.observaciones.errors %}<div class="text-danger small mt-1">{{ form.observaciones.errors }}</div>{% endif %}
+          </div>
+
           <hr>
           <button type="submit" class="btn btn-primary"><i class="fas fa-save mr-1"></i> Guardar</button>
           <a href="{% url 'clients:list' %}" class="btn btn-secondary ml-2">Cancelar</a>

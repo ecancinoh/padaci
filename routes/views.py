@@ -107,7 +107,9 @@ def _match_clients_from_text(text_lines, umbral=0.52):
     Para cada línea OCR busca el cliente cuyo nombre sea más similar
     usando difflib.SequenceMatcher.
     Solo acepta coincidencias con ratio >= umbral.
-    Retorna lista de Clientes encontrados (sin duplicados, un match por línea).
+    Retorna tupla (clientes_encontrados, lineas_no_encontradas):
+      - clientes_encontrados: lista de Clientes encontrados (sin duplicados)
+      - lineas_no_encontradas: lista de strings de líneas que no tuvieron match
     """
     from difflib import SequenceMatcher
 
@@ -116,6 +118,7 @@ def _match_clients_from_text(text_lines, umbral=0.52):
     nombres_norm = [(c['id'], _normalizar(c['nombre'])) for c in todos]
 
     found = []
+    no_encontradas = []
     seen_ids = set()
 
     for linea in text_lines:
@@ -139,9 +142,13 @@ def _match_clients_from_text(text_lines, umbral=0.52):
                 found.append(cliente)
                 seen_ids.add(mejor_id)
             except Cliente.DoesNotExist:
-                pass
+                no_encontradas.append(linea.strip())
+        else:
+            # No se encontró coincidencia suficiente → línea sin registrar
+            if mejor_ratio < umbral:
+                no_encontradas.append(linea.strip())
 
-    return found
+    return found, no_encontradas
 
 
 # ── Views ──────────────────────────────────────────────────────────────────────
@@ -222,13 +229,14 @@ def procesar_foto_ruta(request, pk):
     ruta.texto_extraido = texto_completo
     ruta.save(update_fields=['texto_extraido'])
 
-    clientes_encontrados = _match_clients_from_text(lineas)
+    clientes_encontrados, no_encontrados = _match_clients_from_text(lineas)
     data = {
         'texto_extraido': texto_completo,
         'clientes': [
             {'id': c.pk, 'nombre': c.nombre, 'comuna': c.comuna}
             for c in clientes_encontrados
         ],
+        'no_encontrados': no_encontrados,
     }
     return JsonResponse(data)
 
@@ -252,12 +260,17 @@ def buscar_por_texto_ruta(request, pk):
     if not lineas:
         return JsonResponse({'error': 'El texto está vacío.'}, status=400)
 
-    clientes_encontrados = _match_clients_from_text(lineas)
+    # Para texto libre usamos un umbral de confianza más alto (0.72):
+    # el usuario escribe nombres limpios y sólo deben considerarse "encontrados"
+    # los clientes con una coincidencia muy cercana. Así, nombres que no existen
+    # en la BD aparecerán siempre en la sección "no encontrados" con botón Registrar.
+    clientes_encontrados, no_encontrados = _match_clients_from_text(lineas, umbral=0.72)
     return JsonResponse({
         'clientes': [
             {'id': c.pk, 'nombre': c.nombre, 'comuna': c.comuna}
             for c in clientes_encontrados
         ],
+        'no_encontrados': no_encontrados,
     })
 
 
@@ -350,6 +363,7 @@ def crear_entregas_desde_ruta(request, pk):
                 'entrega_id': eid,
                 'cliente': c.nombre,
                 'comuna': c.comuna,
+                'observaciones': c.observaciones or '',
                 'lat': float(c.latitud) if c.latitud else None,
                 'lon': float(c.longitud) if c.longitud else None,
             })
@@ -400,6 +414,7 @@ def optimizar_ruta(request, pk):
         paradas_guardadas.append({
             'orden': i,
             'cliente': c.nombre,
+            'observaciones': c.observaciones or '',
             'lat': float(c.latitud) if c.latitud else None,
             'lon': float(c.longitud) if c.longitud else None,
         })
@@ -489,6 +504,7 @@ def reoptimizar_desde_posicion(request, pk):
                 'entrega_id': eid,
                 'cliente': c.nombre,
                 'comuna': c.comuna or '–',
+                'observaciones': c.observaciones or '',
                 'estado': entrega.estado,
                 'estado_display': entrega.get_estado_display(),
                 'lat': float(c.latitud) if c.latitud else None,
@@ -511,6 +527,7 @@ def reoptimizar_desde_posicion(request, pk):
                 'entrega_id': p_data['id'],
                 'cliente': c.nombre,
                 'comuna': c.comuna or '–',
+                'observaciones': c.observaciones or '',
                 'estado': entrega.estado,
                 'estado_display': entrega.get_estado_display(),
                 'lat': float(c.latitud) if c.latitud else None,

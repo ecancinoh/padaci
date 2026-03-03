@@ -12,10 +12,12 @@
 {% endblock %}
 
 {% block content %}
+<form method="post" action="{% url 'deliveries:eliminar_masiva' %}" id="formMasiva">
+  {% csrf_token %}
 <div class="card shadow mb-4">
-  <div class="card-header py-3">
-    <form method="get" class="form-inline flex-wrap">
-      <input type="text" name="q" value="{{ request.GET.q }}" class="form-control form-control-sm mr-2 mb-1" placeholder="Guía o cliente...">
+  <div class="card-header py-3 d-flex flex-wrap align-items-center justify-content-between">
+    <form method="get" class="form-inline flex-wrap mr-2">
+      <input type="text" name="q" value="{{ request.GET.q }}" class="form-control form-control-sm mr-2 mb-1" placeholder="Cliente...">
       <select name="estado" class="form-control form-control-sm mr-2 mb-1">
         <option value="">Todos los estados</option>
         {% for val, label in estados %}
@@ -26,20 +28,33 @@
       <button type="submit" class="btn btn-primary btn-sm mb-1"><i class="fas fa-filter"></i></button>
       <a href="{% url 'deliveries:list' %}" class="btn btn-outline-secondary btn-sm mb-1 ml-1"><i class="fas fa-times"></i></a>
     </form>
+    <div id="bulkBar" class="d-none align-items-center">
+      <span id="selCount" class="text-sm text-gray-700 mr-2">0 seleccionadas</span>
+      <button type="submit" form="formMasiva" class="btn btn-danger btn-sm"
+              onclick="return confirm('¿Eliminar las entregas seleccionadas? Esta acción no se puede deshacer.')">
+        <i class="fas fa-trash mr-1"></i> Eliminar seleccionadas
+      </button>
+    </div>
   </div>
   <div class="card-body">
     <div class="table-responsive">
       <table class="table table-bordered table-hover table-sm">
         <thead class="thead-light">
           <tr>
-            <th>Cliente</th><th>Conductor</th><th>Fecha Prog.</th><th>Estado</th><th>Acciones</th>
+            <th style="width:36px;">
+              <input type="checkbox" id="chkAll" title="Seleccionar todo">
+            </th>
+            <th>Cliente</th><th>Observaciones</th><th>Fecha Prog.</th><th>Estado</th><th>Acciones</th>
           </tr>
         </thead>
         <tbody>
           {% for e in entregas %}
           <tr>
+            <td class="text-center">
+              <input type="checkbox" name="ids" value="{{ e.pk }}" class="chk-row">
+            </td>
             <td>{{ e.cliente }}</td>
-            <td>{{ e.conductor|default:"–" }}</td>
+            <td><small class="text-muted">{% if e.cliente.observaciones %}<i class="fas fa-sticky-note mr-1 text-warning"></i>{{ e.cliente.observaciones }}{% else %}–{% endif %}</small></td>
             <td>{{ e.fecha_programada }}</td>
             <td>
               <span class="badge badge-{% if e.estado == 'entregado' %}success{% elif e.estado == 'pendiente' %}warning{% elif e.estado == 'fallido' %}danger{% elif e.estado == 'en_ruta' %}primary{% elif e.estado == 'reprogramado' %}info{% else %}secondary{% endif %}">
@@ -54,7 +69,7 @@
             </td>
           </tr>
           {% empty %}
-          <tr><td colspan="5" class="text-center text-muted">No hay entregas registradas.</td></tr>
+          <tr><td colspan="6" class="text-center text-muted">No hay entregas registradas.</td></tr>
           {% endfor %}
         </tbody>
       </table>
@@ -62,4 +77,34 @@
     {% include 'partials/pagination.html' with page_obj=page_obj %}
   </div>
 </div>
+</form>
+
+{% block extra_js %}
+<script>
+(function() {
+  var chkAll = document.getElementById('chkAll');
+  var rows   = document.querySelectorAll('.chk-row');
+  var bar    = document.getElementById('bulkBar');
+  var count  = document.getElementById('selCount');
+
+  function updateBar() {
+    var n = document.querySelectorAll('.chk-row:checked').length;
+    count.textContent = n + ' seleccionada' + (n === 1 ? '' : 's');
+    bar.classList.toggle('d-none', n === 0);
+    bar.classList.toggle('d-flex', n > 0);
+    chkAll.indeterminate = (n > 0 && n < rows.length);
+    chkAll.checked = (n === rows.length && rows.length > 0);
+  }
+
+  chkAll.addEventListener('change', function() {
+    rows.forEach(function(c) { c.checked = chkAll.checked; });
+    updateBar();
+  });
+
+  rows.forEach(function(c) {
+    c.addEventListener('change', updateBar);
+  });
+})();
+</script>
+{% endblock %}
 {% endblock %}

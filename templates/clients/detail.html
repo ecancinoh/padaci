@@ -104,7 +104,7 @@
 var map = L.map('minimap').setView([{{ cliente.latitud }}, {{ cliente.longitud }}], 15);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {attribution:'© OpenStreetMap'}).addTo(map);
 var marker = L.marker([{{ cliente.latitud }}, {{ cliente.longitud }}]).addTo(map);
-marker.bindPopup('<b>{{ cliente.nombre }}</b><br>{{ cliente.comuna }}').openPopup();
+marker.bindPopup('<b>{{ cliente.nombre }}</b><br>{{ cliente.comuna }}{% if cliente.observaciones %}<br><span style="font-size:.82rem;"><i class="fas fa-sticky-note"></i> {{ cliente.observaciones|escapejs }}</span>{% endif %}').openPopup();
 </script>
 {% endif %}
 {% endblock %}

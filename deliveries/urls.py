@@ -10,4 +10,5 @@ urlpatterns = [
     path('<int:pk>/editar/', views.EntregaUpdateView.as_view(), name='update'),
     path('<int:pk>/eliminar/', views.EntregaDeleteView.as_view(), name='delete'),
     path('<int:pk>/estado/', views.actualizar_estado, name='update_estado'),
+    path('eliminar-masiva/', views.eliminar_masiva, name='eliminar_masiva'),
 ]

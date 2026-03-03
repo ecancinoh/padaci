@@ -132,6 +132,7 @@
           <hr>
           <h6 class="font-weight-bold text-gray-700"><span class="step-badge">2</span>Confirmar / Editar clientes</h6>
           <div id="listaClientesOCR" class="mb-2"></div>
+          <div id="noEncontradosSection" class="d-none"></div>
 
           <div class="input-group input-group-sm mb-1">
             <input type="text" id="searchClienteInput" class="form-control" placeholder="Agregar cliente manualmente…" autocomplete="off" oninput="buscarCliente(this.value)">
@@ -186,6 +187,7 @@
                 <div class="flex-grow-1">
                   <strong>{{ p.entrega.cliente.nombre }}</strong>
                   <br><small class="text-muted"><i class="fas fa-map-marker-alt mr-1"></i>{{ p.entrega.cliente.comuna|default:"–" }}</small>
+                  {% if p.entrega.cliente.observaciones %}<br><small style="color:#e6ac00;"><i class="fas fa-sticky-note mr-1"></i>{{ p.entrega.cliente.observaciones }}</small>{% endif %}
                 </div>
                 <div class="text-right ml-2">
                   <span class="badge badge-{% if p.entrega.estado == 'entregado' %}success{% elif p.entrega.estado == 'fallido' %}danger{% elif p.entrega.estado == 'en_ruta' %}primary{% else %}warning{% endif %}">{{ p.entrega.get_estado_display }}</span>
@@ -215,13 +217,14 @@
 {% block extra_js %}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-var RUTA_ID    = {{ ruta.pk }};
-var CSRF       = '{{ csrf_token }}';
-var URL_OCR    = '{% url "routes:procesar_foto" ruta.pk %}';
-var URL_CREAR  = '{% url "routes:crear_entregas" ruta.pk %}';
-var URL_OPT    = '{% url "routes:optimizar" ruta.pk %}';
-var URL_SEARCH = '{% url "routes:buscar_clientes" %}';
-var URL_TEXTO  = '{% url "routes:buscar_por_texto" ruta.pk %}';
+var RUTA_ID          = {{ ruta.pk }};
+var CSRF             = '{{ csrf_token }}';
+var URL_OCR          = '{% url "routes:procesar_foto" ruta.pk %}';
+var URL_CREAR        = '{% url "routes:crear_entregas" ruta.pk %}';
+var URL_OPT          = '{% url "routes:optimizar" ruta.pk %}';
+var URL_SEARCH       = '{% url "routes:buscar_clientes" %}';
+var URL_TEXTO        = '{% url "routes:buscar_por_texto" ruta.pk %}';
+var URL_CREATE_CLIENT = '{% url "clients:create" %}';
 
 var clientesSeleccionados = {};
 
@@ -232,7 +235,7 @@ var routeMarkers = [], polyline = null;
 
 {% if paradas %}
 var paradasIniciales = [{% for p in paradas %}{% if p.entrega.cliente.tiene_coordenadas %}
-  {lat:{{ p.entrega.cliente.latitud }},lon:{{ p.entrega.cliente.longitud }},orden:{{ p.orden }},nombre:"{{ p.entrega.cliente.nombre|escapejs }}"},{% endif %}{% endfor %}];
+  {lat:{{ p.entrega.cliente.latitud }},lon:{{ p.entrega.cliente.longitud }},orden:{{ p.orden }},nombre:"{{ p.entrega.cliente.nombre|escapejs }}",observaciones:"{{ p.entrega.cliente.observaciones|escapejs }}"},{% endif %}{% endfor %}];
 if (paradasIniciales.length) dibujarRuta(paradasIniciales);
 {% endif %}
 
@@ -244,7 +247,10 @@ function dibujarRuta(pts) {
     if (!p.lat || !p.lon) return;
     var icon = L.divIcon({className:'',iconSize:[28,28],iconAnchor:[14,14],
       html:'<div style="background:#4e73df;color:#fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:12px;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)">'+p.orden+'</div>'});
-    var m = L.marker([p.lat,p.lon],{icon:icon}).addTo(map).bindPopup('<b>'+p.orden+'. '+p.nombre+'</b>');
+    var m = L.marker([p.lat,p.lon],{icon:icon}).addTo(map).bindPopup(
+      '<b>'+p.orden+'. '+(p.nombre||p.cliente)+'</b>' +
+      (p.observaciones ? '<br><div class="mt-1" style="font-size:.8rem;background:#fffbe6;border-radius:4px;padding:3px 5px;"><i class="fas fa-sticky-note mr-1 text-warning"></i>' + p.observaciones + '</div>' : '')
+    );
     routeMarkers.push(m); ll.push([p.lat,p.lon]);
   });
   if (ll.length>1){ polyline=L.polyline(ll,{color:'#4e73df',weight:3,dashArray:'6,4'}).addTo(map); map.fitBounds(polyline.getBounds().pad(0.1)); }
@@ -289,6 +295,7 @@ function buscarPorTexto() {
       html = '<div class="alert alert-warning alert-sm py-2"><i class="fas fa-exclamation-triangle mr-1"></i>No se encontraron coincidencias. Ajusta los nombres o agrégalos manualmente.</div>';
     }
     document.getElementById('listaClientesOCR').innerHTML = html;
+    renderNoEncontrados(data.no_encontrados || []);
     document.getElementById('step2').classList.remove('d-none');
     updateResumen();
   })
@@ -321,6 +328,7 @@ function procesarFoto() {
       document.getElementById('btnOCR').disabled = false;
     }
     document.getElementById('listaClientesOCR').innerHTML = html;
+    renderNoEncontrados(data.no_encontrados || []);
     document.getElementById('step2').classList.remove('d-none');
     updateResumen();
   })
@@ -439,12 +447,40 @@ function renderParadas(paradas) {
       '<div class="d-flex align-items-center">'+
         '<span class="parada-num mr-3">'+p.orden+'</span>'+
         '<div class="flex-grow-1"><strong>'+escHtml(p.cliente)+'</strong>'+
-          '<br><small class="text-muted"><i class="fas fa-map-marker-alt mr-1"></i>'+escHtml(p.comuna||'–')+'</small></div>'+
+          '<br><small class="text-muted"><i class="fas fa-map-marker-alt mr-1"></i>'+escHtml(p.comuna||'–')+'</small>'+
+          (p.observaciones ? '<br><small class="text-warning"><i class="fas fa-sticky-note mr-1"></i>'+escHtml(p.observaciones)+'</small>' : '')+
+          '</div>'+
         '<div class="text-right ml-2"><span class="badge badge-warning">Pendiente</span><br>'+nav+'</div>'+
       '</div></div></div>';
   });
   var sp = document.getElementById('sinParadas'); if(sp) sp.remove();
   document.getElementById('paradasContainer').innerHTML = html;
+}
+
+/* ── NO ENCONTRADOS ── */
+function renderNoEncontrados(lineas) {
+  var section = document.getElementById('noEncontradosSection');
+  if (!lineas || !lineas.length) {
+    section.classList.add('d-none');
+    section.innerHTML = '';
+    return;
+  }
+  var rows = lineas.map(function(nombre) {
+    var url = URL_CREATE_CLIENT + '?nombre=' + encodeURIComponent(nombre);
+    return '<div class="d-flex align-items-center justify-content-between px-2 py-1 border-bottom">' +
+      '<span class="small text-danger"><i class="fas fa-user-times mr-1"></i>' + escHtml(nombre) + '</span>' +
+      '<a href="' + url + '" target="_blank" class="btn btn-outline-primary btn-sm py-0 px-2 ml-2" style="font-size:.75rem;white-space:nowrap;">' +
+      '<i class="fas fa-user-plus mr-1"></i>Registrar</a></div>';
+  }).join('');
+  section.innerHTML =
+    '<div class="alert alert-warning py-2 mb-2">' +
+      '<strong><i class="fas fa-exclamation-triangle mr-1"></i>' + lineas.length + ' nombre(s) no encontrado(s) en la base de datos:</strong>' +
+      '<div class="border rounded mt-2 bg-white" style="max-height:160px;overflow-y:auto;">' + rows + '</div>' +
+      '<div class="small text-muted mt-1"><i class="fas fa-info-circle mr-1"></i>' +
+        'Registra el cliente en la nueva pestaña y luego agrégalo con el buscador de abajo.' +
+      '</div>' +
+    '</div>';
+  section.classList.remove('d-none');
 }
 
 /* ── UTILS ── */
