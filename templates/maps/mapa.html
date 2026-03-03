@@ -20,6 +20,8 @@
   <div class="text-muted small">
     <i class="fas fa-circle text-success mr-1"></i>{{ clientes.count }} clientes geolocalizados
     &nbsp;|&nbsp;
+    <i class="fas fa-circle text-warning mr-1"></i>{{ clientes_sin_coords.count }} sin coordenadas
+    &nbsp;|&nbsp;
     <a href="{% url 'clients:create' %}" class="btn btn-sm btn-outline-primary">
       <i class="fas fa-plus mr-1"></i>Nuevo Cliente
     </a>
@@ -44,7 +46,6 @@
 </div>
 
 <!-- Tabla lateral de clientes sin coordenadas -->
-{% with sin_coords=clientes|length %}
 <div class="card shadow mb-4">
   <div class="card-header py-3">
     <h6 class="m-0 font-weight-bold text-warning">
@@ -56,22 +57,23 @@
       <table class="table table-sm">
         <thead class="thead-light"><tr><th>Cliente</th><th>Dirección</th><th>Ciudad</th><th>Acción</th></tr></thead>
         <tbody>
-          {% for c in clientes %}
-            {% if not c.tiene_coordenadas %}
+          {% for c in clientes_sin_coords %}
             <tr>
               <td>{{ c }}</td>
               <td>{{ c.direccion }}</td>
               <td>{{ c.ciudad }}</td>
               <td><a href="{% url 'clients:update' c.pk %}" class="btn btn-warning btn-sm"><i class="fas fa-map-pin mr-1"></i>Agregar coords</a></td>
             </tr>
-            {% endif %}
+          {% empty %}
+            <tr>
+              <td colspan="4" class="text-muted text-center">Todos los clientes activos tienen coordenadas registradas.</td>
+            </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
   </div>
 </div>
-{% endwith %}
 {% endblock %}
 
 {% block extra_js %}

@@ -7,8 +7,23 @@ from clients.models import Cliente
 @login_required
 def mapa_chile(request):
     """Vista principal del mapa de Chile con marcadores de clientes."""
-    clientes = Cliente.objects.filter(activo=True, latitud__isnull=False, longitud__isnull=False)
-    return render(request, 'maps/mapa.html', {'clientes': clientes})
+    clientes_con_coords = Cliente.objects.filter(
+        activo=True,
+        latitud__isnull=False,
+        longitud__isnull=False,
+    )
+    clientes_sin_coords = Cliente.objects.filter(activo=True).filter(
+        latitud__isnull=True,
+    ) | Cliente.objects.filter(activo=True).filter(
+        longitud__isnull=True,
+    )
+    clientes_sin_coords = clientes_sin_coords.distinct()
+
+    context = {
+        'clientes': clientes_con_coords,
+        'clientes_sin_coords': clientes_sin_coords,
+    }
+    return render(request, 'maps/mapa.html', context)
 
 
 @login_required
