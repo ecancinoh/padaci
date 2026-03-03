@@ -106,7 +106,7 @@ fetch('{% url "maps:geojson" %}')
         + (props.empresa ? '<i class="fas fa-building mr-1"></i>' + props.empresa + '<br>' : '')
         + (props.telefono ? '<i class="fas fa-phone mr-1"></i>' + props.telefono + '<br>' : '')
         + (props.observaciones ? '<div class="mt-1 p-1 bg-light rounded" style="font-size:.82rem;"><i class="fas fa-sticky-note mr-1 text-warning"></i><em>' + props.observaciones + '</em></div>' : '')
-        '<div class="mt-2">' +
+        + '<div class="mt-2">' +
         '<a href="/clientes/' + props.id + '/" class="btn btn-xs btn-info btn-sm mr-1"><i class="fas fa-eye"></i> Ver</a>' +
         '<a href="https://waze.com/ul?ll=' + lat + ',' + lon + '&navigate=yes" target="_blank" class="btn btn-xs btn-primary btn-sm"><i class="fab fa-waze"></i> Waze</a>' +
         '</div></div>'
