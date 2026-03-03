@@ -55,7 +55,6 @@ class ClienteForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['comuna'].required = False
         for name, field in self.fields.items():
             field.widget.attrs.update({'class': 'form-control'})
         self.fields['nombre'].widget.attrs['placeholder'] = 'Ej: Juan Pérez'
