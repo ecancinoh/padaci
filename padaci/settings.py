@@ -2,10 +2,31 @@
 PADACI – Sistema de Logística de Entrega
 Django settings
 """
+import os
 from pathlib import Path
-from decouple import config
-import pymysql
-pymysql.install_as_MySQLdb()
+
+try:
+    from decouple import config  # type: ignore
+except Exception:
+    # Fallback for hosting environments where python-decouple is not installed.
+    def config(name, default=None, cast=str):
+        value = os.getenv(name, default)
+        if cast is bool and isinstance(value, str):
+            return value.strip().lower() in {"1", "true", "yes", "on"}
+        if cast and value is not None and cast is not bool:
+            try:
+                return cast(value)
+            except Exception:
+                return default
+        return value
+
+try:
+    import pymysql
+
+    pymysql.install_as_MySQLdb()
+except Exception:
+    # If PyMySQL is unavailable but mysqlclient exists, Django can still work.
+    pass
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
