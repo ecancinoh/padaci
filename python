@@ -1,9 +1,50 @@
-import sys
+import glob
 import os
+import sys
+import traceback
 
-sys.path.insert(0, '/home/padacicl/repositories/padaci')
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'padaci.settings')
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+if BASE_DIR not in sys.path:
+    sys.path.insert(0, BASE_DIR)
 
-from django.core.wsgi import get_wsgi_application
 
-application = get_wsgi_application()
+def _add_venv_site_packages() -> None:
+    patterns = [
+        os.path.join(BASE_DIR, "venv", "lib", "python*", "site-packages"),
+        os.path.join(BASE_DIR, ".venv", "lib", "python*", "site-packages"),
+        "/home/padacicl/virtualenv/repositories/padaci/3.11/lib/python3.11/site-packages",
+        "/home/padacicl/virtualenv/padaci/3.11/lib/python3.11/site-packages",
+    ]
+    for pattern in patterns:
+        for site_packages in glob.glob(pattern):
+            if site_packages not in sys.path:
+                sys.path.insert(0, site_packages)
+
+
+def _write_startup_error(exc_text: str) -> None:
+    log_candidates = [
+        os.path.join(BASE_DIR, "passenger_wsgi_error.log"),
+        os.path.join(BASE_DIR, "tmp", "passenger_wsgi_error.log"),
+        "/tmp/padaci_passenger_wsgi_error.log",
+    ]
+    for path in log_candidates:
+        try:
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "a", encoding="utf-8") as error_log:
+                error_log.write("\n=== Python entrypoint startup error ===\n")
+                error_log.write(exc_text)
+            break
+        except Exception:
+            continue
+
+
+try:
+	_add_venv_site_packages()
+	os.environ.setdefault("DJANGO_SETTINGS_MODULE", "padaci.settings")
+
+	from django.core.wsgi import get_wsgi_application
+
+	application = get_wsgi_application()
+except Exception:
+	_write_startup_error(traceback.format_exc())
+	raise

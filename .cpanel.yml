@@ -7,3 +7,5 @@ deployment:
     - $PYBIN -m pip install -r $DEPLOYPATH/requirements.txt
     - $PYBIN $DEPLOYPATH/manage.py migrate --noinput
     - $PYBIN $DEPLOYPATH/manage.py collectstatic --noinput
+    - mkdir -p $DEPLOYPATH/tmp
+    - touch $DEPLOYPATH/tmp/restart.txt
