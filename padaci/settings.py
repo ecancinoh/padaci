@@ -10,7 +10,8 @@ pymysql.install_as_MySQLdb()
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # ── Security ──────────────────────────────────────────────────────────────────
-SECRET_KEY = config('SECRET_KEY')
+# Fallback key avoids hard crash when environment variables are not loaded in hosting.
+SECRET_KEY = config('SECRET_KEY', default='django-insecure-padaci-change-this-secret-key')
 DEBUG = config('DEBUG', default=False, cast=bool)
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='127.0.0.1').split(',')
 GEMINI_API_KEY = config('GEMINI_API_KEY', default='')
