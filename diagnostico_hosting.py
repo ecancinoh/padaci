@@ -1,6 +1,7 @@
 """
 Diagnostico rapido para cPanel (Setup Python App -> Execute python script).
-Imprime informacion clave de entorno y prueba carga de Django/WSGI.
+Imprime informacion clave y tambien guarda un reporte en archivo para evitar
+recortes de salida en la interfaz de cPanel.
 """
 import os
 import sys
@@ -8,62 +9,91 @@ import traceback
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent
-print("=== PADACI Hosting Diagnostico ===")
-print(f"BASE_DIR={BASE_DIR}")
-print(f"PYTHON={sys.executable}")
-print(f"VERSION={sys.version}")
-print(f"CWD={Path.cwd()}")
-print("\n--- PATH (primeras 10 entradas) ---")
-for idx, p in enumerate(sys.path[:10], 1):
-    print(f"{idx}. {p}")
+LINES = []
 
-print("\n--- ENV CLAVE ---")
-for key in [
-    "DJANGO_SETTINGS_MODULE",
-    "SECRET_KEY",
-    "DEBUG",
-    "ALLOWED_HOSTS",
-    "DB_NAME",
-    "DB_USER",
-    "DB_HOST",
-    "DB_PORT",
-]:
-    value = os.getenv(key)
-    if value and key in {"SECRET_KEY", "DB_PASSWORD"}:
-        print(f"{key}=***set***")
-    else:
-        print(f"{key}={value}")
 
-print("\n--- Import checks ---")
-for module in ["django", "decouple", "pymysql", "MySQLdb"]:
+def out(text: str = "") -> None:
+    LINES.append(text)
+    print(text, flush=True)
+
+
+def persist_report() -> None:
+    report = "\n".join(LINES) + "\n"
+    report_paths = [
+        BASE_DIR / "tmp" / "diagnostico_hosting.log",
+        BASE_DIR / "diagnostico_hosting.log",
+        Path("/tmp/padaci_diagnostico_hosting.log"),
+    ]
+    for path in report_paths:
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(report, encoding="utf-8")
+            out(f"REPORTE_GUARDADO={path}")
+            return
+        except Exception as exc:
+            out(f"WARN no se pudo escribir {path}: {exc}")
+
+
+try:
+    out("=== PADACI Hosting Diagnostico ===")
+    out(f"BASE_DIR={BASE_DIR}")
+    out(f"PYTHON={sys.executable}")
+    out(f"VERSION={sys.version}")
+    out(f"CWD={Path.cwd()}")
+
+    out("\n--- PATH (primeras 20 entradas) ---")
+    for idx, p in enumerate(sys.path[:20], 1):
+        out(f"{idx}. {p}")
+
+    out("\n--- ENV CLAVE ---")
+    for key in [
+        "DJANGO_SETTINGS_MODULE",
+        "SECRET_KEY",
+        "DEBUG",
+        "ALLOWED_HOSTS",
+        "DB_NAME",
+        "DB_USER",
+        "DB_HOST",
+        "DB_PORT",
+    ]:
+        value = os.getenv(key)
+        if value and key in {"SECRET_KEY"}:
+            out(f"{key}=***set***")
+        else:
+            out(f"{key}={value}")
+
+    out("\n--- Import checks ---")
+    for module in ["django", "decouple", "pymysql", "MySQLdb"]:
+        try:
+            __import__(module)
+            out(f"OK import {module}")
+        except Exception as exc:
+            out(f"FAIL import {module}: {exc}")
+
+    out("\n--- Django setup ---")
     try:
-        __import__(module)
-        print(f"OK import {module}")
-    except Exception as exc:
-        print(f"FAIL import {module}: {exc}")
+        if str(BASE_DIR) not in sys.path:
+            sys.path.insert(0, str(BASE_DIR))
+        os.environ.setdefault("DJANGO_SETTINGS_MODULE", "padaci.settings")
 
-print("\n--- Django setup ---")
-try:
-    if str(BASE_DIR) not in sys.path:
-        sys.path.insert(0, str(BASE_DIR))
-    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "padaci.settings")
+        import django
 
-    import django
+        django.setup()
+        out(f"OK django.setup() - version {django.get_version()}")
+    except Exception:
+        out("FAIL django.setup()")
+        out(traceback.format_exc())
 
-    django.setup()
-    print(f"OK django.setup() - version {django.get_version()}")
-except Exception:
-    print("FAIL django.setup()")
-    traceback.print_exc()
+    out("\n--- WSGI load ---")
+    try:
+        from django.core.wsgi import get_wsgi_application
 
-print("\n--- WSGI load ---")
-try:
-    from django.core.wsgi import get_wsgi_application
+        app = get_wsgi_application()
+        out(f"OK get_wsgi_application() => {app}")
+    except Exception:
+        out("FAIL get_wsgi_application()")
+        out(traceback.format_exc())
 
-    app = get_wsgi_application()
-    print(f"OK get_wsgi_application() => {app}")
-except Exception:
-    print("FAIL get_wsgi_application()")
-    traceback.print_exc()
-
-print("=== FIN DIAGNOSTICO ===")
+    out("=== FIN DIAGNOSTICO ===")
+finally:
+    persist_report()
