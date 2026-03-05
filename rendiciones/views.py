@@ -10,11 +10,16 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
 from django.views.generic import ListView, DetailView, DeleteView
 from openpyxl import load_workbook
-from reportlab.lib import colors
-from reportlab.lib.pagesizes import letter
-from reportlab.pdfgen import canvas
 from .forms import RendicionRepartoForm, build_formsets, get_clientes_ruta_nombres
 from .models import RendicionReparto
+
+
+def _load_reportlab():
+    """Lazy import so the app can boot even if reportlab is not installed."""
+    from reportlab.lib.pagesizes import letter
+    from reportlab.pdfgen import canvas
+
+    return letter, canvas
 
 
 def _money(value):
@@ -272,6 +277,15 @@ def rendicion_update(request, pk):
 
 @login_required
 def rendicion_pdf(request, pk):
+    try:
+        letter, canvas = _load_reportlab()
+    except Exception:
+        messages.error(
+            request,
+            'La exportacion PDF no esta disponible en este entorno. Falta instalar la dependencia reportlab.',
+        )
+        return redirect('rendiciones:detail', pk=pk)
+
     rendicion = get_object_or_404(
         RendicionReparto.objects.select_related('ruta__conductor', 'ruta__empresa'),
         pk=pk,
