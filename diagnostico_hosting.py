@@ -121,6 +121,29 @@ try:
         out("FAIL DB connect")
         out(traceback.format_exc())
 
+    out("\n--- Request checks ---")
+    try:
+        from django.conf import settings
+        from django.test import Client
+        from django.test.utils import override_settings
+
+        hosts = list(settings.ALLOWED_HOSTS)
+        if "testserver" not in hosts:
+            hosts.append("testserver")
+
+        with override_settings(ALLOWED_HOSTS=hosts):
+            client = Client()
+            for path in ["/", "/accounts/login/", "/admin/"]:
+                try:
+                    response = client.get(path)
+                    out(f"REQ {path} => status={response.status_code}")
+                except Exception:
+                    out(f"FAIL request {path}")
+                    out(traceback.format_exc())
+    except Exception:
+        out("FAIL request checks setup")
+        out(traceback.format_exc())
+
     out("=== FIN DIAGNOSTICO ===")
 finally:
     persist_report()
