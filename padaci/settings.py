@@ -176,7 +176,15 @@ DJANGO_TABLES2_TEMPLATE = 'django_tables2/bootstrap4.html'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # ── Hardening producción ─────────────────────────────────────────────────────
-SECURE_PROXY_SSL_HEADER = ('HTTP_X_HTTPS', '1')
+# Configurable proxy SSL header for shared hostings (cPanel/Passenger, Nginx, etc.).
+_proxy_ssl_header_raw = config('SECURE_PROXY_SSL_HEADER', default='').strip()
+if _proxy_ssl_header_raw:
+    _parts = [p.strip() for p in _proxy_ssl_header_raw.split(',') if p.strip()]
+    SECURE_PROXY_SSL_HEADER = (_parts[0], _parts[1]) if len(_parts) == 2 else None
+else:
+    SECURE_PROXY_SSL_HEADER = None
+
+USE_X_FORWARDED_HOST = config('USE_X_FORWARDED_HOST', default=False, cast=bool)
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = 'same-origin'
 X_FRAME_OPTIONS = 'DENY'
@@ -184,7 +192,8 @@ X_FRAME_OPTIONS = 'DENY'
 if not DEBUG:
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
-    SECURE_SSL_REDIRECT = config('SECURE_SSL_REDIRECT', default=True, cast=bool)
+    # Defaulting to False avoids redirect loops when proxy SSL headers are not configured.
+    SECURE_SSL_REDIRECT = config('SECURE_SSL_REDIRECT', default=False, cast=bool)
     SECURE_HSTS_SECONDS = config('SECURE_HSTS_SECONDS', default=31536000, cast=int)
     SECURE_HSTS_INCLUDE_SUBDOMAINS = config('SECURE_HSTS_INCLUDE_SUBDOMAINS', default=True, cast=bool)
     SECURE_HSTS_PRELOAD = config('SECURE_HSTS_PRELOAD', default=True, cast=bool)
