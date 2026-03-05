@@ -77,9 +77,12 @@ try:
         os.environ.setdefault("DJANGO_SETTINGS_MODULE", "padaci.settings")
 
         import django
+        from django.conf import settings
 
         django.setup()
         out(f"OK django.setup() - version {django.get_version()}")
+        out(f"SETTINGS.DEBUG={settings.DEBUG}")
+        out(f"SETTINGS.ALLOWED_HOSTS={settings.ALLOWED_HOSTS}")
     except Exception:
         out("FAIL django.setup()")
         out(traceback.format_exc())
@@ -92,6 +95,30 @@ try:
         out(f"OK get_wsgi_application() => {app}")
     except Exception:
         out("FAIL get_wsgi_application()")
+        out(traceback.format_exc())
+
+    out("\n--- Database check ---")
+    try:
+        from django.conf import settings
+        from django.db import connections
+
+        db = settings.DATABASES.get("default", {})
+        out(
+            "DB_RESUELTA="
+            f"ENGINE={db.get('ENGINE')} "
+            f"NAME={db.get('NAME')} "
+            f"USER={db.get('USER')} "
+            f"HOST={db.get('HOST')} "
+            f"PORT={db.get('PORT')}"
+        )
+
+        conn = connections["default"]
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT 1")
+            row = cursor.fetchone()
+        out(f"OK DB connect SELECT 1 => {row}")
+    except Exception:
+        out("FAIL DB connect")
         out(traceback.format_exc())
 
     out("=== FIN DIAGNOSTICO ===")
