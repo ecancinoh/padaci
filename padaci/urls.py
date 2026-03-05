@@ -19,10 +19,10 @@ urlpatterns = [
     path('dashboard/', include('dashboard.urls', namespace='dashboard')),
     path('clientes/', include('clients.urls', namespace='clients')),
     path('empresas/', include('companies.urls', namespace='companies')),
-    path('entregas/', include('deliveries.urls', namespace='deliveries')),
     path('historial/', include('history.urls', namespace='history')),
     path('mapa/', include('maps.urls', namespace='maps')),
     path('rutas/', include('routes.urls', namespace='routes')),
+    path('rendiciones/', include('rendiciones.urls', namespace='rendiciones')),
 ]
 
 if settings.DEBUG:

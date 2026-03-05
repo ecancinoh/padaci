@@ -1,6 +1,6 @@
 from django.db import models
 from django.conf import settings
-from deliveries.models import Entrega
+from routes.models import Entrega
 
 
 class HistorialDia(models.Model):

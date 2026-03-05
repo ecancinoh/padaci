@@ -47,6 +47,7 @@ LOCAL_APPS = [
     'history',
     'maps',
     'routes',
+    'rendiciones',
     'dashboard',
 ]
 
@@ -120,6 +121,11 @@ LANGUAGE_CODE = 'es-cl'
 TIME_ZONE = 'America/Santiago'
 USE_I18N = True
 USE_TZ = True
+USE_THOUSAND_SEPARATOR = True
+THOUSAND_SEPARATOR = '.'
+DECIMAL_SEPARATOR = ','
+NUMBER_GROUPING = 3
+FORMAT_MODULE_PATH = ['padaci.formats']
 
 # ── Static & Media ────────────────────────────────────────────────────────────
 STATIC_URL = '/static/'

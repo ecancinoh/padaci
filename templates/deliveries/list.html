@@ -1,18 +1,18 @@
 {% extends 'base.html' %}
 {% block title %}Entregas – PADACI{% endblock %}
-{% block active_deliveries %}active{% endblock %}
+{% block active_routes %}active{% endblock %}
 
 {% block page_heading %}
 <div class="d-sm-flex align-items-center justify-content-between mb-4">
   <h1 class="h3 mb-0 text-gray-800"><i class="fas fa-box mr-2 text-primary"></i>Registro de Entregas</h1>
-  <a href="{% url 'deliveries:create' %}" class="btn btn-primary btn-sm shadow-sm">
+  <a href="{% url 'routes:entregas_create' %}" class="btn btn-primary btn-sm shadow-sm">
     <i class="fas fa-plus mr-1"></i> Nueva Entrega
   </a>
 </div>
 {% endblock %}
 
 {% block content %}
-<form method="post" action="{% url 'deliveries:eliminar_masiva' %}" id="formMasiva">
+<form method="post" action="{% url 'routes:entregas_eliminar_masiva' %}" id="formMasiva">
   {% csrf_token %}
 <div class="card shadow mb-4">
   <div class="card-header py-3 d-flex flex-wrap align-items-center justify-content-between">
@@ -26,7 +26,7 @@
       </select>
       <input type="date" name="fecha" value="{{ request.GET.fecha }}" class="form-control form-control-sm mr-2 mb-1">
       <button type="submit" class="btn btn-primary btn-sm mb-1"><i class="fas fa-filter"></i></button>
-      <a href="{% url 'deliveries:list' %}" class="btn btn-outline-secondary btn-sm mb-1 ml-1"><i class="fas fa-times"></i></a>
+      <a href="{% url 'routes:entregas_list' %}" class="btn btn-outline-secondary btn-sm mb-1 ml-1"><i class="fas fa-times"></i></a>
     </form>
     <div id="bulkBar" class="d-none align-items-center">
       <span id="selCount" class="text-sm text-gray-700 mr-2">0 seleccionadas</span>
@@ -62,10 +62,10 @@
               </span>
             </td>
             <td>
-              <a href="{% url 'deliveries:detail' e.pk %}" class="btn btn-info btn-sm"><i class="fas fa-eye"></i></a>
-              <a href="{% url 'deliveries:update_estado' e.pk %}" class="btn btn-success btn-sm" title="Actualizar estado"><i class="fas fa-sync"></i></a>
-              <a href="{% url 'deliveries:update' e.pk %}" class="btn btn-warning btn-sm"><i class="fas fa-edit"></i></a>
-              <a href="{% url 'deliveries:delete' e.pk %}" class="btn btn-danger btn-sm"><i class="fas fa-trash"></i></a>
+              <a href="{% url 'routes:entregas_detail' e.pk %}" class="btn btn-info btn-sm"><i class="fas fa-eye"></i></a>
+              <a href="{% url 'routes:entregas_update_estado' e.pk %}" class="btn btn-success btn-sm" title="Actualizar estado"><i class="fas fa-sync"></i></a>
+              <a href="{% url 'routes:entregas_update' e.pk %}" class="btn btn-warning btn-sm"><i class="fas fa-edit"></i></a>
+              <a href="{% url 'routes:entregas_delete' e.pk %}" class="btn btn-danger btn-sm"><i class="fas fa-trash"></i></a>
             </td>
           </tr>
           {% empty %}

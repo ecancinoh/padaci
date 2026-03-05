@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+{% block title %}Eliminar Rendición – PADACI{% endblock %}
+{% block active_rendiciones %}active{% endblock %}
+
+{% block page_heading %}
+<h1 class="h3 mb-4 text-gray-800"><i class="fas fa-trash mr-2 text-danger"></i>Eliminar Rendición</h1>
+{% endblock %}
+
+{% block content %}
+<div class="card shadow mb-4">
+  <div class="card-body">
+    <p>¿Deseas eliminar la rendición del <strong>{{ object.fecha }}</strong> (ruta #{{ object.ruta.pk }})?</p>
+    <form method="post">
+      {% csrf_token %}
+      <button class="btn btn-danger" type="submit"><i class="fas fa-trash mr-1"></i>Eliminar</button>
+      <a href="{% url 'rendiciones:detail' object.pk %}" class="btn btn-secondary">Cancelar</a>
+    </form>
+  </div>
+</div>
+{% endblock %}

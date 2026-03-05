@@ -1,0 +1,113 @@
+{% extends 'base.html' %}
+{% block title %}Rendición {{ rendicion.fecha }} – PADACI{% endblock %}
+{% block active_rendiciones %}active{% endblock %}
+
+{% block page_heading %}
+<div class="d-sm-flex align-items-center justify-content-between mb-4">
+  <h1 class="h3 mb-0 text-gray-800"><i class="fas fa-file-invoice-dollar mr-2 text-primary"></i>Rendición {{ rendicion.fecha }}</h1>
+  <div>
+    <a href="{% url 'rendiciones:excel' rendicion.pk %}" class="btn btn-success btn-sm"><i class="fas fa-file-excel mr-1"></i>Excel</a>
+    <a href="{% url 'rendiciones:pdf' rendicion.pk %}" class="btn btn-secondary btn-sm" target="_blank"><i class="fas fa-file-pdf mr-1"></i>PDF</a>
+    <a href="{% url 'rendiciones:update' rendicion.pk %}" class="btn btn-warning btn-sm"><i class="fas fa-edit mr-1"></i>Editar</a>
+    <a href="{% url 'rendiciones:list' %}" class="btn btn-light btn-sm"><i class="fas fa-arrow-left mr-1"></i>Volver</a>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+  <div class="col-lg-5">
+    <div class="card shadow mb-4">
+      <div class="card-header py-3"><h6 class="m-0 font-weight-bold text-primary">Encabezado</h6></div>
+      <div class="card-body">
+        <dl class="row mb-0">
+          <dt class="col-sm-5">Ruta:</dt><dd class="col-sm-7"><a href="{% url 'routes:detail' rendicion.ruta.pk %}">#{{ rendicion.ruta.pk }}</a></dd>
+          <dt class="col-sm-5">Distribuidora:</dt><dd class="col-sm-7">{{ rendicion.distribuidora|default:'–' }}</dd>
+          <dt class="col-sm-5">Repartidor:</dt><dd class="col-sm-7">{{ rendicion.nombre_repartidor }}</dd>
+          <dt class="col-sm-5">Peoneta:</dt><dd class="col-sm-7">{{ rendicion.nombre_peoneta|default:'–' }}</dd>
+        </dl>
+      </div>
+    </div>
+
+    <div class="card shadow mb-4">
+      <div class="card-header py-3"><h6 class="m-0 font-weight-bold text-primary">Resumen</h6></div>
+      <div class="card-body p-0">
+        <table class="table table-sm mb-0">
+          <tr><th>Estacionamientos</th><td>${{ rendicion.estacionamientos }}</td></tr>
+          <tr><th>Diferencia menos</th><td>${{ rendicion.diferencia_menos }}</td></tr>
+          <tr><th>Diferencia más</th><td>${{ rendicion.diferencia_mas }}</td></tr>
+          <tr><th>Total consolidado</th><td>${{ rendicion.total_consolidado }}</td></tr>
+          <tr><th>Menos ítems (A,B,C,D,E)</th><td>${{ rendicion.menos_items }}</td></tr>
+          <tr><th>Total dinero a recibir</th><td><strong>${{ rendicion.total_dinero_recibir }}</strong></td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-7">
+    <div class="card shadow mb-4">
+      <div class="card-header py-3"><h6 class="m-0 font-weight-bold text-primary">Crédito con documentos (A)</h6></div>
+      <div class="card-body p-0">
+        <table class="table table-sm mb-0">
+          <thead class="thead-light"><tr><th>N° factura</th><th>Cliente</th><th>Monto</th><th>Banco</th></tr></thead>
+          <tbody>{% for it in rendicion.creditos_documentos.all %}<tr><td>{{ it.numero_factura }}</td><td>{{ it.nombre_cliente }}</td><td>${{ it.monto }}</td><td>{{ it.banco }}</td></tr>{% empty %}<tr><td colspan="4" class="text-center text-muted">Sin registros.</td></tr>{% endfor %}</tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card shadow mb-4">
+      <div class="card-header py-3"><h6 class="m-0 font-weight-bold text-primary">Devoluciones parciales (B)</h6></div>
+      <div class="card-body p-0">
+        <table class="table table-sm mb-0">
+          <thead class="thead-light"><tr><th>N° factura</th><th>Motivo</th><th>Monto</th></tr></thead>
+          <tbody>{% for it in rendicion.devoluciones_parciales.all %}<tr><td>{{ it.numero_factura }}</td><td>{{ it.motivo }}</td><td>${{ it.monto }}</td></tr>{% empty %}<tr><td colspan="3" class="text-center text-muted">Sin registros.</td></tr>{% endfor %}</tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card shadow mb-4">
+      <div class="card-header py-3"><h6 class="m-0 font-weight-bold text-primary">Créditos de confianza (C)</h6></div>
+      <div class="card-body p-0">
+        <table class="table table-sm mb-0">
+          <thead class="thead-light"><tr><th>N° factura</th><th>Autoriza</th><th>Monto</th></tr></thead>
+          <tbody>{% for it in rendicion.creditos_confianza.all %}<tr><td>{{ it.numero_factura }}</td><td>{{ it.autoriza_credito }}</td><td>${{ it.monto }}</td></tr>{% empty %}<tr><td colspan="3" class="text-center text-muted">Sin registros.</td></tr>{% endfor %}</tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-lg-6">
+    <div class="card shadow mb-4">
+      <div class="card-header py-3"><h6 class="m-0 font-weight-bold text-primary">Facturas nulas (D)</h6></div>
+      <div class="card-body p-0">
+        <table class="table table-sm mb-0">
+          <thead class="thead-light"><tr><th>N° factura</th><th>Monto</th></tr></thead>
+          <tbody>{% for it in rendicion.facturas_nulas_detalle.all %}<tr><td>{{ it.numero_factura }}</td><td>${{ it.monto }}</td></tr>{% empty %}<tr><td colspan="2" class="text-center text-muted">Sin registros.</td></tr>{% endfor %}</tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card shadow mb-4">
+      <div class="card-header py-3"><h6 class="m-0 font-weight-bold text-primary">Depósitos o transferencias (E)</h6></div>
+      <div class="card-body p-0">
+        <table class="table table-sm mb-0">
+          <thead class="thead-light"><tr><th>N° factura</th><th>Monto</th></tr></thead>
+          <tbody>{% for it in rendicion.depositos_transferencias.all %}<tr><td>{{ it.numero_factura }}</td><td>${{ it.monto }}</td></tr>{% empty %}<tr><td colspan="2" class="text-center text-muted">Sin registros.</td></tr>{% endfor %}</tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card shadow mb-4">
+  <div class="card-header py-3"><h6 class="m-0 font-weight-bold text-primary">Control final</h6></div>
+  <div class="card-body p-0">
+    <table class="table table-sm mb-0">
+      <tr><th>Facturas totales</th><td>{{ rendicion.facturas_totales }}</td><th>Kilometraje inicial</th><td>{{ rendicion.kilometraje_inicial }}</td></tr>
+      <tr><th>Facturas entregadas</th><td>{{ rendicion.facturas_entregadas }}</td><th>Kilometraje final</th><td>{{ rendicion.kilometraje_final }}</td></tr>
+      <tr><th>Facturas nulas</th><td>{{ rendicion.facturas_nulas }}</td><th>Total kilómetros recorridos</th><td>{{ rendicion.total_kilometros_recorridos }}</td></tr>
+    </table>
+  </div>
+</div>
+{% endblock %}

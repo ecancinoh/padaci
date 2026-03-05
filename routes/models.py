@@ -1,7 +1,66 @@
 from django.db import models
 from django.conf import settings
 from companies.models import Empresa
-from deliveries.models import Entrega
+from clients.models import Cliente
+
+
+class Entrega(models.Model):
+    """Registro individual de entrega de paquete."""
+
+    ESTADO_CHOICES = [
+        ('pendiente', 'Pendiente'),
+        ('en_ruta', 'En Ruta'),
+        ('entregado', 'Entregado'),
+        ('fallido', 'Intento Fallido'),
+        ('reprogramado', 'Reprogramado'),
+        ('devuelto', 'Devuelto'),
+    ]
+
+    cliente = models.ForeignKey(
+        Cliente,
+        on_delete=models.PROTECT,
+        related_name='entregas',
+        verbose_name='Cliente',
+    )
+    empresa = models.ForeignKey(
+        Empresa,
+        on_delete=models.PROTECT,
+        related_name='entregas',
+        verbose_name='Empresa Solicitante',
+        null=True,
+        blank=True,
+    )
+    conductor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='entregas_asignadas',
+        verbose_name='Conductor',
+        limit_choices_to={'rol': 'conductor'},
+    )
+
+    descripcion = models.TextField(blank=True, null=True, verbose_name='Descripción del paquete')
+    estado = models.CharField(max_length=15, choices=ESTADO_CHOICES, default='pendiente', verbose_name='Estado')
+    fecha_programada = models.DateField(verbose_name='Fecha Programada')
+    fecha_entrega = models.DateTimeField(null=True, blank=True, verbose_name='Fecha/Hora Entrega Real')
+    observacion = models.TextField(blank=True, null=True, verbose_name='Observación')
+    foto_evidencia = models.ImageField(upload_to='entregas/evidencia/', blank=True, null=True, verbose_name='Foto Evidencia')
+
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    fecha_actualizacion = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Entrega'
+        verbose_name_plural = 'Entregas'
+        ordering = ['-fecha_programada', 'cliente']
+        db_table = 'deliveries_entrega'
+
+    def __str__(self):
+        return f'Entrega {self.cliente} – {self.fecha_programada} [{self.get_estado_display()}]'
+
+    def esta_completada(self):
+        return self.estado == 'entregado'
 
 
 class RutaDia(models.Model):
@@ -29,7 +88,22 @@ class RutaDia(models.Model):
         related_name='rutas',
         verbose_name='Conductor',
     )
+    peoneta = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='rutas_peoneta',
+        verbose_name='Peoneta',
+        null=True,
+        blank=True,
+    )
     estado = models.CharField(max_length=15, choices=ESTADO_CHOICES, default='planificada', verbose_name='Estado')
+    total_consolidado = models.DecimalField(
+        max_digits=14,
+        decimal_places=0,
+        default=0,
+        verbose_name='Total consolidado (CLP)',
+        help_text='Monto total consolidado en pesos chilenos.',
+    )
     foto_hoja_ruta = models.ImageField(
         upload_to='rutas/fotos/',
         blank=True,

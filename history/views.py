@@ -6,7 +6,7 @@ from django.shortcuts import render
 from django.db.models import Count, Q
 from django.utils import timezone
 from .models import HistorialDia, DetalleHistorial
-from deliveries.models import Entrega
+from routes.models import Entrega
 
 
 class HistorialListView(LoginRequiredMixin, ListView):

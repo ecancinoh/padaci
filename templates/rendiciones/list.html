@@ -1,0 +1,67 @@
+{% extends 'base.html' %}
+{% block title %}Rendiciones – PADACI{% endblock %}
+{% block active_rendiciones %}active{% endblock %}
+
+{% block page_heading %}
+<div class="d-sm-flex align-items-center justify-content-between mb-4">
+  <h1 class="h3 mb-0 text-gray-800"><i class="fas fa-file-invoice-dollar mr-2 text-primary"></i>Rendiciones de Reparto</h1>
+  <div>
+    <a href="{% url 'rendiciones:plantilla_excel' %}" class="btn btn-success btn-sm shadow-sm mr-2">
+      <i class="fas fa-file-excel mr-1"></i>Plantilla Excel
+    </a>
+    <a href="{% url 'rendiciones:create' %}" class="btn btn-primary btn-sm shadow-sm">
+      <i class="fas fa-plus mr-1"></i>Nueva Rendición
+    </a>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="card shadow mb-4">
+  <div class="card-header py-3">
+    <form method="get" class="form-inline">
+      <label class="mr-1">Fecha:</label>
+      <input type="date" name="fecha" value="{{ request.GET.fecha }}" class="form-control form-control-sm mr-2">
+      <input type="text" name="repartidor" value="{{ request.GET.repartidor }}" class="form-control form-control-sm mr-2" placeholder="Repartidor">
+      <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-filter"></i></button>
+    </form>
+  </div>
+  <div class="card-body">
+    <div class="table-responsive">
+      <table class="table table-bordered table-hover table-sm mb-0">
+        <thead class="thead-light">
+          <tr>
+            <th>Fecha</th>
+            <th>Ruta</th>
+            <th>Repartidor</th>
+            <th>Total consolidado</th>
+            <th>Total a recibir</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in rendiciones %}
+          <tr>
+            <td>{{ r.fecha }}</td>
+            <td><a href="{% url 'routes:detail' r.ruta.pk %}">Ruta #{{ r.ruta.pk }}</a></td>
+            <td>{{ r.nombre_repartidor }}</td>
+            <td>${{ r.total_consolidado }}</td>
+            <td>${{ r.total_dinero_recibir }}</td>
+            <td>
+              <a href="{% url 'rendiciones:detail' r.pk %}" class="btn btn-info btn-sm"><i class="fas fa-eye"></i></a>
+              <a href="{% url 'rendiciones:update' r.pk %}" class="btn btn-warning btn-sm"><i class="fas fa-edit"></i></a>
+              <a href="{% url 'rendiciones:excel' r.pk %}" class="btn btn-success btn-sm"><i class="fas fa-file-excel"></i></a>
+              <a href="{% url 'rendiciones:pdf' r.pk %}" class="btn btn-secondary btn-sm" target="_blank"><i class="fas fa-file-pdf"></i></a>
+              <a href="{% url 'rendiciones:delete' r.pk %}" class="btn btn-danger btn-sm"><i class="fas fa-trash"></i></a>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="6" class="text-center text-muted">No hay rendiciones registradas.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% include 'partials/pagination.html' with page_obj=page_obj %}
+  </div>
+</div>
+{% endblock %}

@@ -25,7 +25,7 @@
       <table class="table table-bordered table-hover table-sm">
         <thead class="thead-light">
           <tr>
-            <th>Fecha</th><th>Empresa</th><th>Conductor</th><th>Estado</th><th>Paradas</th><th>Foto Ruta</th><th>Acciones</th>
+            <th>Fecha</th><th>Empresa</th><th>Conductor</th><th>Peoneta</th><th>Estado</th><th>Total Consolidado</th><th>Paradas</th><th>Foto Ruta</th><th>Acciones</th>
           </tr>
         </thead>
         <tbody>
@@ -34,11 +34,13 @@
             <td><strong>{{ r.fecha }}</strong></td>
             <td>{{ r.empresa.nombre|default:"–" }}</td>
             <td>{{ r.conductor.get_full_name }}</td>
+            <td>{% if r.peoneta %}{{ r.peoneta.get_full_name }}{% else %}–{% endif %}</td>
             <td>
               <span class="badge badge-{% if r.estado == 'completada' %}success{% elif r.estado == 'en_curso' %}primary{% elif r.estado == 'planificada' %}warning{% else %}secondary{% endif %}">
                 {{ r.get_estado_display }}
               </span>
             </td>
+            <td>${{ r.total_consolidado|default:0 }}</td>
             <td><span class="badge badge-info">{{ r.total_paradas }}</span></td>
             <td>
               {% if r.foto_hoja_ruta %}
@@ -55,7 +57,7 @@
             </td>
           </tr>
           {% empty %}
-          <tr><td colspan="7" class="text-center text-muted">No hay rutas registradas.</td></tr>
+          <tr><td colspan="9" class="text-center text-muted">No hay rutas registradas.</td></tr>
           {% endfor %}
         </tbody>
       </table>

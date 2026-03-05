@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load l10n %}
 {% block title %}Ruta {{ ruta.fecha }} – PADACI{% endblock %}
 {% block active_routes %}active{% endblock %}
 
@@ -29,6 +30,11 @@
     </span>
   </h1>
   <div>
+    {% if rendicion %}
+    <a href="{% url 'rendiciones:detail' rendicion.pk %}" class="btn btn-dark btn-sm"><i class="fas fa-file-invoice-dollar mr-1"></i>Rendición</a>
+    {% else %}
+    <a href="{% url 'rendiciones:create' %}?ruta={{ ruta.pk }}" class="btn btn-dark btn-sm"><i class="fas fa-file-invoice-dollar mr-1"></i>Nueva Rendición</a>
+    {% endif %}
     <a href="{% url 'routes:navegacion' ruta.pk %}" class="btn btn-success btn-sm"><i class="fas fa-map-marked-alt mr-1"></i>Navegar</a>
     <a href="{% url 'routes:update' ruta.pk %}" class="btn btn-warning btn-sm"><i class="fas fa-edit"></i></a>
     <a href="{% url 'routes:list' %}" class="btn btn-secondary btn-sm"><i class="fas fa-arrow-left"></i> Volver</a>
@@ -50,6 +56,10 @@
           <dd class="col-sm-7">{% if ruta.empresa %}<a href="{% url 'companies:detail' ruta.empresa.pk %}">{{ ruta.empresa.nombre }}</a>{% else %}–{% endif %}</dd>
           <dt class="col-sm-5">Conductor:</dt>
           <dd class="col-sm-7">{{ ruta.conductor.get_full_name }}</dd>
+          <dt class="col-sm-5">Peoneta:</dt>
+          <dd class="col-sm-7">{% if ruta.peoneta %}{{ ruta.peoneta.get_full_name }}{% else %}–{% endif %}</dd>
+          <dt class="col-sm-5">Total consolidado:</dt>
+          <dd class="col-sm-7">${{ ruta.total_consolidado|default:0 }}</dd>
           <dt class="col-sm-5">Paradas:</dt>
           <dd class="col-sm-7"><span class="badge badge-info" id="totalParadasBadge">{{ ruta.total_paradas }}</span></dd>
           <dt class="col-sm-5">Observación:</dt>
@@ -187,10 +197,22 @@
                 <div class="flex-grow-1">
                   <strong>{{ p.entrega.cliente.nombre }}</strong>
                   <br><small class="text-muted"><i class="fas fa-map-marker-alt mr-1"></i>{{ p.entrega.cliente.comuna|default:"–" }}</small>
+                  <br><small class="text-muted"><i class="fas fa-building mr-1"></i>{{ p.entrega.empresa.nombre|default:"Sin empresa" }}</small>
+                  <br><small class="text-muted"><i class="fas fa-user mr-1"></i>{{ p.entrega.conductor.get_full_name|default:"Sin conductor" }}</small>
+                  <br><small class="text-muted"><i class="fas fa-calendar-alt mr-1"></i>Programada: {{ p.entrega.fecha_programada|date:"d-m-Y" }}</small>
+                  <br><small class="text-success {% if not p.entrega.fecha_entrega %}d-none{% endif %}" id="fecha-entrega-{{ p.entrega.pk }}"><i class="fas fa-check-circle mr-1"></i>Entregada: {% if p.entrega.fecha_entrega %}{{ p.entrega.fecha_entrega|date:"d-m-Y H:i" }}{% endif %}</small>
+                  {% if p.entrega.descripcion %}<br><small class="text-muted"><i class="fas fa-box-open mr-1"></i>{{ p.entrega.descripcion }}</small>{% endif %}
+                  {% if p.entrega.observacion %}<br><small class="text-info"><i class="fas fa-comment-dots mr-1"></i>{{ p.entrega.observacion }}</small>{% endif %}
                   {% if p.entrega.cliente.observaciones %}<br><small style="color:#e6ac00;"><i class="fas fa-sticky-note mr-1"></i>{{ p.entrega.cliente.observaciones }}</small>{% endif %}
                 </div>
                 <div class="text-right ml-2">
-                  <span class="badge badge-{% if p.entrega.estado == 'entregado' %}success{% elif p.entrega.estado == 'fallido' %}danger{% elif p.entrega.estado == 'en_ruta' %}primary{% else %}warning{% endif %}">{{ p.entrega.get_estado_display }}</span>
+                  <span class="badge badge-{% if p.entrega.estado == 'entregado' %}success{% elif p.entrega.estado == 'fallido' %}danger{% elif p.entrega.estado == 'en_ruta' %}primary{% else %}warning{% endif %}" id="estado-badge-{{ p.entrega.pk }}">{{ p.entrega.get_estado_display }}</span>
+                  <br>
+                  <select class="form-control form-control-sm mt-1" style="min-width:150px;" onchange="actualizarEstadoParada({{ p.entrega.pk }}, this)">
+                    {% for value, label in p.entrega.ESTADO_CHOICES %}
+                      <option value="{{ value }}" {% if p.entrega.estado == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                  </select>
                   {% if p.entrega.cliente.tiene_coordenadas %}
                   <br>
                   <a href="{{ p.entrega.cliente.url_waze }}" target="_blank" class="btn btn-info btn-sm mt-1" title="Waze"><i class="fas fa-route"></i></a>
@@ -224,7 +246,16 @@ var URL_CREAR        = '{% url "routes:crear_entregas" ruta.pk %}';
 var URL_OPT          = '{% url "routes:optimizar" ruta.pk %}';
 var URL_SEARCH       = '{% url "routes:buscar_clientes" %}';
 var URL_TEXTO        = '{% url "routes:buscar_por_texto" ruta.pk %}';
+var URL_ACTUALIZAR_PARADA = '{% url "routes:actualizar_parada" ruta.pk %}';
 var URL_CREATE_CLIENT = '{% url "clients:create" %}';
+var ESTADOS_ENTREGA = [
+  {value:'pendiente', label:'Pendiente'},
+  {value:'en_ruta', label:'En Ruta'},
+  {value:'entregado', label:'Entregado'},
+  {value:'fallido', label:'Intento Fallido'},
+  {value:'reprogramado', label:'Reprogramado'},
+  {value:'devuelto', label:'Devuelto'}
+];
 
 var clientesSeleccionados = {};
 
@@ -235,7 +266,7 @@ var routeMarkers = [], polyline = null;
 
 {% if paradas %}
 var paradasIniciales = [{% for p in paradas %}{% if p.entrega.cliente.tiene_coordenadas %}
-  {lat:{{ p.entrega.cliente.latitud }},lon:{{ p.entrega.cliente.longitud }},orden:{{ p.orden }},nombre:"{{ p.entrega.cliente.nombre|escapejs }}",observaciones:"{{ p.entrega.cliente.observaciones|escapejs }}"},{% endif %}{% endfor %}];
+  {lat:{{ p.entrega.cliente.latitud|unlocalize }},lon:{{ p.entrega.cliente.longitud|unlocalize }},orden:{{ p.orden }},nombre:"{{ p.entrega.cliente.nombre|escapejs }}",observaciones:"{{ p.entrega.cliente.observaciones|escapejs }}"},{% endif %}{% endfor %}];
 if (paradasIniciales.length) dibujarRuta(paradasIniciales);
 {% endif %}
 
@@ -287,14 +318,12 @@ function buscarPorTexto() {
     document.getElementById('btnBuscarTexto').disabled = false;
     if (data.error) { showAlert('danger', data.error); return; }
     clientesSeleccionados = {};
-    var html = '';
     if (data.clientes && data.clientes.length > 0) {
-      data.clientes.forEach(function(c){ clientesSeleccionados[c.id] = c; html += renderRow(c, true); });
-      html = '<div class="border rounded mb-1" style="max-height:220px;overflow-y:auto;">' + html + '</div>';
+      data.clientes.forEach(function(c){ clientesSeleccionados[c.id] = c; });
+      renderListaClientesSeleccionados();
     } else {
-      html = '<div class="alert alert-warning alert-sm py-2"><i class="fas fa-exclamation-triangle mr-1"></i>No se encontraron coincidencias. Ajusta los nombres o agrégalos manualmente.</div>';
+      document.getElementById('listaClientesOCR').innerHTML = '<div class="alert alert-warning alert-sm py-2"><i class="fas fa-exclamation-triangle mr-1"></i>No se encontraron coincidencias. Ajusta los nombres o agrégalos manualmente.</div>';
     }
-    document.getElementById('listaClientesOCR').innerHTML = html;
     renderNoEncontrados(data.no_encontrados || []);
     document.getElementById('step2').classList.remove('d-none');
     updateResumen();
@@ -319,15 +348,13 @@ function procesarFoto() {
       document.getElementById('textoExtraidoSection').classList.remove('d-none');
     }
     clientesSeleccionados = {};
-    var html = '';
     if (data.clientes && data.clientes.length > 0) {
-      data.clientes.forEach(function(c){ clientesSeleccionados[c.id]=c; html+=renderRow(c,true); });
-      html = '<div class="border rounded mb-1" style="max-height:220px;overflow-y:auto;">'+html+'</div>';
+      data.clientes.forEach(function(c){ clientesSeleccionados[c.id]=c; });
+      renderListaClientesSeleccionados();
     } else {
-      html = '<div class="alert alert-warning alert-sm py-2"><i class="fas fa-exclamation-triangle mr-1"></i>No se detectaron clientes automáticamente. Agrega manualmente.</div>';
+      document.getElementById('listaClientesOCR').innerHTML = '<div class="alert alert-warning alert-sm py-2"><i class="fas fa-exclamation-triangle mr-1"></i>No se detectaron clientes automáticamente. Agrega manualmente.</div>';
       document.getElementById('btnOCR').disabled = false;
     }
-    document.getElementById('listaClientesOCR').innerHTML = html;
     renderNoEncontrados(data.no_encontrados || []);
     document.getElementById('step2').classList.remove('d-none');
     updateResumen();
@@ -340,6 +367,20 @@ function renderRow(c, checked) {
     '<input type="checkbox" class="mr-2" id="chk-'+c.id+'" '+(checked?'checked':'')+' onclick="event.stopPropagation();toggleCliente('+c.id+')">' +
     '<span class="font-weight-bold small">'+escHtml(c.nombre)+'</span>&nbsp;' +
     '<span class="badge badge-light">'+escHtml(c.comuna||'–')+'</span></div>';
+}
+
+function renderListaClientesSeleccionados() {
+  var ids = Object.keys(clientesSeleccionados);
+  if (!ids.length) {
+    document.getElementById('listaClientesOCR').innerHTML = '';
+    return;
+  }
+  var html = '<div class="border rounded mb-1" style="max-height:220px;overflow-y:auto;">';
+  ids.forEach(function(id) {
+    html += renderRow(clientesSeleccionados[id], true);
+  });
+  html += '</div>';
+  document.getElementById('listaClientesOCR').innerHTML = html;
 }
 
 function toggleCliente(id) {
@@ -370,7 +411,7 @@ function buscarCliente(q) {
         html = '<div class="search-result-item text-muted">Sin resultados</div>';
       } else {
         data.clientes.forEach(function(c){
-          html += '<div class="search-result-item" onclick="agregarManual('+c.id+','+JSON.stringify(c.nombre)+','+JSON.stringify(c.comuna||'')+')">'+
+          html += '<div class="search-result-item" data-id="'+c.id+'" data-nombre="'+encodeURIComponent(c.nombre)+'" data-comuna="'+encodeURIComponent(c.comuna||'')+'" onclick="agregarManualDesdeElemento(this)">'+
             '<i class="fas fa-user mr-1 text-primary"></i>'+escHtml(c.nombre)+
             ' <span class="badge badge-light">'+escHtml(c.comuna||'–')+'</span></div>';
         });
@@ -380,19 +421,24 @@ function buscarCliente(q) {
   }, 300);
 }
 
+function agregarManualDesdeElemento(el) {
+  var id = parseInt(el.getAttribute('data-id'), 10);
+  if (isNaN(id)) {
+    showAlert('danger', 'No se pudo agregar el cliente seleccionado.');
+    return;
+  }
+  var nombre = decodeURIComponent(el.getAttribute('data-nombre') || '');
+  var comuna = decodeURIComponent(el.getAttribute('data-comuna') || '');
+  agregarManual(id, nombre, comuna);
+}
+
 function agregarManual(id, nombre, comuna) {
   document.getElementById('searchClienteInput').value = '';
   document.getElementById('searchClienteResults').classList.add('d-none');
-  var chk = document.getElementById('chk-'+id);
-  if (chk) { chk.checked=true; clientesSeleccionados[id]={id:id,nombre:nombre,comuna:comuna}; updateResumen(); return; }
-  var container = document.querySelector('#listaClientesOCR > div');
-  if (!container) {
-    document.getElementById('listaClientesOCR').innerHTML='<div class="border rounded mb-1" style="max-height:220px;overflow-y:auto;"></div>';
-    container = document.querySelector('#listaClientesOCR > div');
-  }
+  if (!id) return;
   var c = {id:id,nombre:nombre,comuna:comuna};
-  container.insertAdjacentHTML('beforeend', renderRow(c,true));
   clientesSeleccionados[id] = c;
+  renderListaClientesSeleccionados();
   updateResumen();
 }
 
@@ -434,6 +480,59 @@ function reOptimizar() {
 }
 
 /* ── RENDER PARADAS DOM ── */
+function estadoBadgeClass(estado) {
+  if (estado === 'entregado') return 'success';
+  if (estado === 'fallido') return 'danger';
+  if (estado === 'en_ruta') return 'primary';
+  return 'warning';
+}
+
+function estadoOptionsHtml(currentEstado) {
+  var html = '';
+  ESTADOS_ENTREGA.forEach(function(estado) {
+    html += '<option value="' + estado.value + '"' + (estado.value === currentEstado ? ' selected' : '') + '>' + estado.label + '</option>';
+  });
+  return html;
+}
+
+function actualizarEstadoParada(entregaId, selectEl) {
+  var nuevoEstado = selectEl.value;
+  selectEl.disabled = true;
+  fetch(URL_ACTUALIZAR_PARADA, {
+    method: 'POST',
+    headers: {'Content-Type':'application/json', 'X-CSRFToken': CSRF},
+    body: JSON.stringify({entrega_id: entregaId, estado: nuevoEstado})
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(data) {
+    selectEl.disabled = false;
+    if (data.error) {
+      showAlert('danger', data.error);
+      return;
+    }
+    var badge = document.getElementById('estado-badge-' + entregaId);
+    if (badge) {
+      badge.className = 'badge badge-' + estadoBadgeClass(data.estado);
+      badge.textContent = data.estado_display;
+    }
+    var fechaEntregaEl = document.getElementById('fecha-entrega-' + entregaId);
+    if (fechaEntregaEl) {
+      if (data.fecha_entrega) {
+        fechaEntregaEl.classList.remove('d-none');
+        fechaEntregaEl.innerHTML = '<i class="fas fa-check-circle mr-1"></i>Entregada: ' + escHtml(data.fecha_entrega);
+      } else {
+        fechaEntregaEl.classList.add('d-none');
+        fechaEntregaEl.innerHTML = '<i class="fas fa-check-circle mr-1"></i>Entregada:';
+      }
+    }
+    showAlert('success', 'Estado actualizado a <strong>' + escHtml(data.estado_display) + '</strong>.');
+  })
+  .catch(function(e) {
+    selectEl.disabled = false;
+    showAlert('danger', 'No se pudo actualizar el estado: ' + e.message);
+  });
+}
+
 function renderParadas(paradas) {
   var html = '';
   paradas.forEach(function(p) {
@@ -443,14 +542,31 @@ function renderParadas(paradas) {
       ? '<a href="'+wazeUrl+'"  target="_blank" class="btn btn-info  btn-sm mt-1" title="Waze"><i class="fas fa-route"></i></a>'+
         '<a href="'+gmapsUrl+'" target="_blank" class="btn btn-danger btn-sm mt-1" title="Google Maps"><i class="fas fa-map"></i></a>'
       : '';
+    var estadoTxt = p.estado_display || 'Pendiente';
+    var estadoCls = estadoBadgeClass(p.estado || 'pendiente');
+    var empresa = p.empresa ? escHtml(p.empresa) : 'Sin empresa';
+    var conductor = p.conductor ? escHtml(p.conductor) : 'Sin conductor';
+    var fechaProgramada = p.fecha_programada ? escHtml(p.fecha_programada) : '—';
+    var fechaEntrega = '<br><small class="text-success ' + (p.fecha_entrega ? '' : 'd-none') + '" id="fecha-entrega-' + p.entrega_id + '"><i class="fas fa-check-circle mr-1"></i>Entregada: ' + (p.fecha_entrega ? escHtml(p.fecha_entrega) : '') + '</small>';
+    var descripcion = p.descripcion ? '<br><small class="text-muted"><i class="fas fa-box-open mr-1"></i>'+escHtml(p.descripcion)+'</small>' : '';
+    var observacionEntrega = p.observacion_entrega ? '<br><small class="text-info"><i class="fas fa-comment-dots mr-1"></i>'+escHtml(p.observacion_entrega)+'</small>' : '';
     html += '<div class="card parada-card mb-2 shadow-sm"><div class="card-body py-2 px-3">'+
       '<div class="d-flex align-items-center">'+
         '<span class="parada-num mr-3">'+p.orden+'</span>'+
         '<div class="flex-grow-1"><strong>'+escHtml(p.cliente)+'</strong>'+
           '<br><small class="text-muted"><i class="fas fa-map-marker-alt mr-1"></i>'+escHtml(p.comuna||'–')+'</small>'+
+          '<br><small class="text-muted"><i class="fas fa-building mr-1"></i>'+empresa+'</small>'+
+          '<br><small class="text-muted"><i class="fas fa-user mr-1"></i>'+conductor+'</small>'+
+          '<br><small class="text-muted"><i class="fas fa-calendar-alt mr-1"></i>Programada: '+fechaProgramada+'</small>'+
+          fechaEntrega +
+          descripcion +
+          observacionEntrega +
           (p.observaciones ? '<br><small class="text-warning"><i class="fas fa-sticky-note mr-1"></i>'+escHtml(p.observaciones)+'</small>' : '')+
           '</div>'+
-        '<div class="text-right ml-2"><span class="badge badge-warning">Pendiente</span><br>'+nav+'</div>'+
+        '<div class="text-right ml-2"><span class="badge badge-'+estadoCls+'" id="estado-badge-'+p.entrega_id+'">'+escHtml(estadoTxt)+'</span>'+
+        '<br><select class="form-control form-control-sm mt-1" style="min-width:150px;" onchange="actualizarEstadoParada(' + p.entrega_id + ', this)">' +
+          estadoOptionsHtml(p.estado || 'pendiente') +
+        '</select><br>'+nav+'</div>'+
       '</div></div></div>';
   });
   var sp = document.getElementById('sinParadas'); if(sp) sp.remove();

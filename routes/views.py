@@ -9,10 +9,115 @@ from django.urls import reverse_lazy
 from django.shortcuts import get_object_or_404, redirect, render
 from django.http import JsonResponse
 from django.db.models import Q
-from .models import RutaDia, ParadaRuta
-from .forms import RutaDiaForm
-from deliveries.models import Entrega
+from django.utils import timezone
+from .models import RutaDia, ParadaRuta, Entrega
+from .forms import RutaDiaForm, EntregaForm, EntregaEstadoForm
 from clients.models import Cliente
+
+
+class EntregaRutaListView(LoginRequiredMixin, ListView):
+    model = Entrega
+    template_name = 'deliveries/list.html'
+    context_object_name = 'entregas'
+    paginate_by = 20
+
+    def get_queryset(self):
+        qs = super().get_queryset().select_related('cliente', 'empresa', 'conductor')
+        estado = self.request.GET.get('estado', '')
+        fecha = self.request.GET.get('fecha', '')
+        q = self.request.GET.get('q', '')
+        if estado:
+            qs = qs.filter(estado=estado)
+        if fecha:
+            qs = qs.filter(fecha_programada=fecha)
+        if q:
+            qs = qs.filter(numero_guia__icontains=q) | qs.filter(cliente__nombre__icontains=q)
+        return qs
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx['estados'] = Entrega.ESTADO_CHOICES
+        return ctx
+
+
+class EntregaRutaCreateView(LoginRequiredMixin, CreateView):
+    model = Entrega
+    form_class = EntregaForm
+    template_name = 'deliveries/form.html'
+    success_url = reverse_lazy('routes:entregas_list')
+
+    def form_valid(self, form):
+        messages.success(self.request, 'Entrega registrada exitosamente.')
+        return super().form_valid(form)
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx['titulo'] = 'Registrar Entrega'
+        return ctx
+
+
+class EntregaRutaUpdateView(LoginRequiredMixin, UpdateView):
+    model = Entrega
+    form_class = EntregaForm
+    template_name = 'deliveries/form.html'
+    success_url = reverse_lazy('routes:entregas_list')
+
+    def form_valid(self, form):
+        messages.success(self.request, 'Entrega actualizada correctamente.')
+        return super().form_valid(form)
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx['titulo'] = 'Editar Entrega'
+        return ctx
+
+
+class EntregaRutaDeleteView(LoginRequiredMixin, DeleteView):
+    model = Entrega
+    template_name = 'deliveries/confirm_delete.html'
+    success_url = reverse_lazy('routes:entregas_list')
+
+    def form_valid(self, form):
+        messages.success(self.request, 'Entrega eliminada.')
+        return super().form_valid(form)
+
+
+class EntregaRutaDetailView(LoginRequiredMixin, DetailView):
+    model = Entrega
+    template_name = 'deliveries/detail.html'
+    context_object_name = 'entrega'
+
+
+@login_required
+def entregas_eliminar_masiva(request):
+    if request.method != 'POST':
+        return redirect('routes:entregas_list')
+    ids = request.POST.getlist('ids')
+    if ids:
+        qs = Entrega.objects.filter(pk__in=ids)
+        total = qs.count()
+        qs.delete()
+        messages.success(request, f'{total} entrega(s) eliminada(s) correctamente.')
+    else:
+        messages.warning(request, 'No se seleccionó ninguna entrega.')
+    return redirect('routes:entregas_list')
+
+
+@login_required
+def entrega_actualizar_estado(request, pk):
+    entrega = get_object_or_404(Entrega, pk=pk)
+    if request.method == 'POST':
+        form = EntregaEstadoForm(request.POST, request.FILES, instance=entrega)
+        if form.is_valid():
+            obj = form.save(commit=False)
+            if obj.estado == 'entregado' and not obj.fecha_entrega:
+                obj.fecha_entrega = timezone.now()
+            obj.save()
+            messages.success(request, 'Estado actualizado correctamente.')
+            return redirect('routes:entregas_detail', pk=pk)
+    else:
+        form = EntregaEstadoForm(instance=entrega)
+    return render(request, 'deliveries/actualizar_estado.html', {'form': form, 'entrega': entrega})
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -160,7 +265,7 @@ class RutaListView(LoginRequiredMixin, ListView):
     paginate_by = 20
 
     def get_queryset(self):
-        qs = super().get_queryset().select_related('conductor')
+        qs = super().get_queryset().select_related('conductor', 'peoneta')
         fecha = self.request.GET.get('fecha', '')
         conductor = self.request.GET.get('conductor', '')
         if fecha:
@@ -211,7 +316,12 @@ class RutaDetailView(LoginRequiredMixin, DetailView):
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        ctx['paradas'] = self.object.paradas.select_related('entrega__cliente').order_by('orden')
+        ctx['paradas'] = self.object.paradas.select_related(
+            'entrega__cliente',
+            'entrega__empresa',
+            'entrega__conductor',
+        ).order_by('orden')
+        ctx['rendicion'] = getattr(self.object, 'rendicion', None)
         return ctx
 
 
@@ -316,6 +426,10 @@ def crear_entregas_desde_ruta(request, pk):
     entregas_creadas = []
     entregas_existentes = []
 
+    entrega_ids_existentes_en_ruta = list(
+        ruta.paradas.values_list('entrega_id', flat=True)
+    )
+
     for cliente in clientes:
         entrega, created = Entrega.objects.get_or_create(
             cliente=cliente,
@@ -331,7 +445,18 @@ def crear_entregas_desde_ruta(request, pk):
         else:
             entregas_existentes.append(entrega)
 
-    todas_las_entregas = entregas_creadas + entregas_existentes
+    entregas_previas = list(Entrega.objects.filter(pk__in=entrega_ids_existentes_en_ruta))
+    todas_las_entregas = entregas_previas + entregas_creadas + entregas_existentes
+
+    # Evitar duplicados manteniendo orden estable
+    entregas_unicas = []
+    seen_ids = set()
+    for entrega in todas_las_entregas:
+        if entrega.pk in seen_ids:
+            continue
+        seen_ids.add(entrega.pk)
+        entregas_unicas.append(entrega)
+    todas_las_entregas = entregas_unicas
 
     # Optimizar con Nearest Neighbor
     points = []
@@ -364,6 +489,14 @@ def crear_entregas_desde_ruta(request, pk):
                 'cliente': c.nombre,
                 'comuna': c.comuna,
                 'observaciones': c.observaciones or '',
+                'empresa': entrega.empresa.nombre if entrega.empresa else '',
+                'conductor': entrega.conductor.get_full_name() if entrega.conductor else '',
+                'descripcion': entrega.descripcion or '',
+                'observacion_entrega': entrega.observacion or '',
+                'fecha_programada': entrega.fecha_programada.strftime('%d-%m-%Y') if entrega.fecha_programada else '',
+                'fecha_entrega': entrega.fecha_entrega.strftime('%d-%m-%Y %H:%M') if entrega.fecha_entrega else '',
+                'estado': entrega.estado,
+                'estado_display': entrega.get_estado_display(),
                 'lat': float(c.latitud) if c.latitud else None,
                 'lon': float(c.longitud) if c.longitud else None,
             })
@@ -413,8 +546,18 @@ def optimizar_ruta(request, pk):
         c = entrega.cliente
         paradas_guardadas.append({
             'orden': i,
+            'entrega_id': eid,
             'cliente': c.nombre,
+            'comuna': c.comuna or '–',
             'observaciones': c.observaciones or '',
+            'empresa': entrega.empresa.nombre if entrega.empresa else '',
+            'conductor': entrega.conductor.get_full_name() if entrega.conductor else '',
+            'descripcion': entrega.descripcion or '',
+            'observacion_entrega': entrega.observacion or '',
+            'fecha_programada': entrega.fecha_programada.strftime('%d-%m-%Y') if entrega.fecha_programada else '',
+            'fecha_entrega': entrega.fecha_entrega.strftime('%d-%m-%Y %H:%M') if entrega.fecha_entrega else '',
+            'estado': entrega.estado,
+            'estado_display': entrega.get_estado_display(),
             'lat': float(c.latitud) if c.latitud else None,
             'lon': float(c.longitud) if c.longitud else None,
         })
@@ -505,6 +648,12 @@ def reoptimizar_desde_posicion(request, pk):
                 'cliente': c.nombre,
                 'comuna': c.comuna or '–',
                 'observaciones': c.observaciones or '',
+                'empresa': entrega.empresa.nombre if entrega.empresa else '',
+                'conductor': entrega.conductor.get_full_name() if entrega.conductor else '',
+                'descripcion': entrega.descripcion or '',
+                'observacion_entrega': entrega.observacion or '',
+                'fecha_programada': entrega.fecha_programada.strftime('%d-%m-%Y') if entrega.fecha_programada else '',
+                'fecha_entrega': entrega.fecha_entrega.strftime('%d-%m-%Y %H:%M') if entrega.fecha_entrega else '',
                 'estado': entrega.estado,
                 'estado_display': entrega.get_estado_display(),
                 'lat': float(c.latitud) if c.latitud else None,
@@ -528,6 +677,12 @@ def reoptimizar_desde_posicion(request, pk):
                 'cliente': c.nombre,
                 'comuna': c.comuna or '–',
                 'observaciones': c.observaciones or '',
+                'empresa': entrega.empresa.nombre if entrega.empresa else '',
+                'conductor': entrega.conductor.get_full_name() if entrega.conductor else '',
+                'descripcion': entrega.descripcion or '',
+                'observacion_entrega': entrega.observacion or '',
+                'fecha_programada': entrega.fecha_programada.strftime('%d-%m-%Y') if entrega.fecha_programada else '',
+                'fecha_entrega': entrega.fecha_entrega.strftime('%d-%m-%Y %H:%M') if entrega.fecha_entrega else '',
                 'estado': entrega.estado,
                 'estado_display': entrega.get_estado_display(),
                 'lat': float(c.latitud) if c.latitud else None,
@@ -551,7 +706,7 @@ def actualizar_estado_parada(request, pk):
     if request.method != 'POST':
         return JsonResponse({'error': 'Método no permitido.'}, status=405)
 
-    get_object_or_404(RutaDia, pk=pk)  # validar que la ruta existe
+    ruta = get_object_or_404(RutaDia, pk=pk)
 
     try:
         body = json.loads(request.body)
@@ -565,14 +720,19 @@ def actualizar_estado_parada(request, pk):
         return JsonResponse({'error': 'Estado no válido.'}, status=400)
 
     from django.utils import timezone
+    get_object_or_404(ParadaRuta, ruta=ruta, entrega_id=entrega_id)
     entrega = get_object_or_404(Entrega, pk=entrega_id)
     entrega.estado = nuevo_estado
-    if nuevo_estado == 'entregado' and not entrega.fecha_entrega:
-        entrega.fecha_entrega = timezone.now()
+    if nuevo_estado == 'entregado':
+        if not entrega.fecha_entrega:
+            entrega.fecha_entrega = timezone.now()
+    else:
+        entrega.fecha_entrega = None
     entrega.save(update_fields=['estado', 'fecha_entrega'])
 
     return JsonResponse({
         'ok': True,
         'estado': entrega.estado,
         'estado_display': entrega.get_estado_display(),
+        'fecha_entrega': entrega.fecha_entrega.strftime('%d-%m-%Y %H:%M') if entrega.fecha_entrega else '',
     })

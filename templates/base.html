@@ -77,19 +77,18 @@
       <hr class="sidebar-divider">
       <div class="sidebar-heading">Operaciones</div>
 
-      <!-- Entregas -->
-      <li class="nav-item {% block active_deliveries %}{% endblock %}">
-        <a class="nav-link" href="{% url 'deliveries:list' %}">
-          <i class="fas fa-fw fa-box"></i>
-          <span>Entregas</span>
-        </a>
-      </li>
-
       <!-- Ruta del Día -->
       <li class="nav-item {% block active_routes %}{% endblock %}">
         <a class="nav-link" href="{% url 'routes:list' %}">
           <i class="fas fa-fw fa-route"></i>
           <span>Ruta del Día</span>
+        </a>
+      </li>
+
+      <li class="nav-item {% block active_rendiciones %}{% endblock %}">
+        <a class="nav-link" href="{% url 'rendiciones:list' %}">
+          <i class="fas fa-fw fa-file-invoice-dollar"></i>
+          <span>Rendiciones</span>
         </a>
       </li>
 
@@ -131,18 +130,6 @@
           <button id="sidebarToggleTop" class="btn btn-link d-md-none rounded-circle mr-3">
             <i class="fa fa-bars"></i>
           </button>
-
-          <!-- Topbar Search -->
-          <form class="d-none d-sm-inline-block form-inline mr-auto ml-md-3 my-2 my-md-0 mw-100 navbar-search" method="get" action="{% url 'deliveries:list' %}">
-            <div class="input-group">
-              <input type="text" name="q" class="form-control bg-light border-0 small" placeholder="Buscar guía, cliente..." aria-label="Buscar">
-              <div class="input-group-append">
-                <button class="btn btn-primary" type="submit">
-                  <i class="fas fa-search fa-sm"></i>
-                </button>
-              </div>
-            </div>
-          </form>
 
           <!-- Topbar Navbar -->
           <ul class="navbar-nav ml-auto">

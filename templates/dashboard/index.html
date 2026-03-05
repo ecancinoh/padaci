@@ -12,76 +12,6 @@
 {% endblock %}
 
 {% block content %}
-
-<!-- ── KPIs Row ─────────────────────────────────────────────── -->
-<div class="row">
-
-  <!-- Total Entregas Hoy -->
-  <div class="col-xl-3 col-md-6 mb-4">
-    <div class="card border-left-primary shadow h-100 py-2">
-      <div class="card-body">
-        <div class="row no-gutters align-items-center">
-          <div class="col mr-2">
-            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Entregas Hoy</div>
-            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_hoy }}</div>
-          </div>
-          <div class="col-auto"><i class="fas fa-boxes fa-2x text-gray-300"></i></div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Entregadas -->
-  <div class="col-xl-3 col-md-6 mb-4">
-    <div class="card border-left-success shadow h-100 py-2">
-      <div class="card-body">
-        <div class="row no-gutters align-items-center">
-          <div class="col mr-2">
-            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Entregadas</div>
-            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ entregadas_hoy }}</div>
-            <div class="mt-2 mb-0 text-muted text-xs">
-              <span class="text-success mr-2">{{ porcentaje_exito }}%</span> tasa de éxito
-            </div>
-          </div>
-          <div class="col-auto"><i class="fas fa-check-circle fa-2x text-gray-300"></i></div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Pendientes -->
-  <div class="col-xl-3 col-md-6 mb-4">
-    <div class="card border-left-warning shadow h-100 py-2">
-      <div class="card-body">
-        <div class="row no-gutters align-items-center">
-          <div class="col mr-2">
-            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Pendientes</div>
-            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ pendientes_hoy }}</div>
-          </div>
-          <div class="col-auto"><i class="fas fa-clock fa-2x text-gray-300"></i></div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Fallidas -->
-  <div class="col-xl-3 col-md-6 mb-4">
-    <div class="card border-left-danger shadow h-100 py-2">
-      <div class="card-body">
-        <div class="row no-gutters align-items-center">
-          <div class="col mr-2">
-            <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">Fallidas</div>
-            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ fallidas_hoy }}</div>
-          </div>
-          <div class="col-auto"><i class="fas fa-times-circle fa-2x text-gray-300"></i></div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-</div>
-
-<!-- ── Segunda fila KPIs ──────────────────────────────────────── -->
 <div class="row">
   <div class="col-xl-3 col-md-6 mb-4">
     <div class="card border-left-info shadow h-100 py-2">
@@ -96,6 +26,7 @@
       </div>
     </div>
   </div>
+
   <div class="col-xl-3 col-md-6 mb-4">
     <div class="card border-left-primary shadow h-100 py-2">
       <div class="card-body">
@@ -109,6 +40,7 @@
       </div>
     </div>
   </div>
+
   <div class="col-xl-3 col-md-6 mb-4">
     <div class="card border-left-success shadow h-100 py-2">
       <div class="card-body">
@@ -122,6 +54,7 @@
       </div>
     </div>
   </div>
+
   <div class="col-xl-3 col-md-6 mb-4">
     <div class="card border-left-warning shadow h-100 py-2">
       <div class="card-body">
@@ -136,7 +69,7 @@
               </div>
               <div class="text-xs text-muted mt-1">{{ ruta_hoy.conductor.get_full_name }}</div>
             {% else %}
-              <div class="h6 mb-0 text-muted">Sin ruta<br><a href="{% url 'routes:create' %}" class="small">+ Crear</a></div>
+              <div class="h6 mb-0 text-muted">Sin ruta</div>
             {% endif %}
           </div>
           <div class="col-auto"><i class="fas fa-route fa-2x text-gray-300"></i></div>
@@ -146,165 +79,15 @@
   </div>
 </div>
 
-<!-- ── Gráficos ──────────────────────────────────────────────── -->
-<div class="row">
-  <!-- Gráfico línea: últimos 7 días -->
-  <div class="col-xl-8 col-lg-7">
-    <div class="card shadow mb-4">
-      <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
-        <h6 class="m-0 font-weight-bold text-primary">Entregas – Últimos 7 Días</h6>
-        <a href="{% url 'history:list' %}" class="btn btn-sm btn-outline-primary">Ver historial</a>
-      </div>
-      <div class="card-body">
-        <div class="chart-area"><canvas id="myAreaChart"></canvas></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Gráfico donut: entregas por estado -->
-  <div class="col-xl-4 col-lg-5">
-    <div class="card shadow mb-4">
-      <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
-        <h6 class="m-0 font-weight-bold text-primary">Entregas por Estado</h6>
-      </div>
-      <div class="card-body">
-        <div class="chart-pie pt-4 pb-2"><canvas id="myPieChart"></canvas></div>
-        <div class="mt-4 text-center small">
-          {% for e in por_estado %}
-            <span class="mr-2">
-              <i class="fas fa-circle
-                {% if e.estado == 'entregado' %}text-success
-                {% elif e.estado == 'pendiente' %}text-warning
-                {% elif e.estado == 'fallido' %}text-danger
-                {% elif e.estado == 'en_ruta' %}text-primary
-                {% elif e.estado == 'reprogramado' %}text-info
-                {% else %}text-secondary{% endif %}"></i>
-              {{ e.estado|title }}: {{ e.total }}
-            </span>
-          {% endfor %}
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- ── Tabla últimas entregas ──────────────────────────────── -->
 <div class="card shadow mb-4">
-  <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
-    <h6 class="m-0 font-weight-bold text-primary">Últimas Entregas Registradas</h6>
-    <a href="{% url 'deliveries:create' %}" class="btn btn-sm btn-primary">
-      <i class="fas fa-plus mr-1"></i> Nueva Entrega
-    </a>
+  <div class="card-header py-3 d-flex align-items-center justify-content-between">
+    <h6 class="m-0 font-weight-bold text-primary">Accesos rápidos</h6>
   </div>
   <div class="card-body">
-    <div class="table-responsive">
-      <table class="table table-bordered table-hover table-sm" id="dataTable">
-        <thead class="thead-light">
-          <tr>
-            <th>Cliente</th>
-            <th>Empresa</th>
-            <th>Fecha Prog.</th>
-            <th>Estado</th>
-            <th>Acción</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for e in ultimas_entregas %}
-          <tr>
-            <td>{{ e.cliente }}</td>
-            <td>{{ e.empresa.nombre }}</td>
-            <td>{{ e.fecha_programada }}</td>
-            <td>
-              <span class="badge badge-{% if e.estado == 'entregado' %}success{% elif e.estado == 'pendiente' %}warning{% elif e.estado == 'fallido' %}danger{% elif e.estado == 'en_ruta' %}primary{% else %}secondary{% endif %}">
-                {{ e.get_estado_display }}
-              </span>
-            </td>
-            <td>
-              <a href="{% url 'deliveries:detail' e.pk %}" class="btn btn-xs btn-info btn-sm">
-                <i class="fas fa-eye"></i>
-              </a>
-              <a href="{% url 'deliveries:update_estado' e.pk %}" class="btn btn-xs btn-warning btn-sm">
-                <i class="fas fa-edit"></i>
-              </a>
-            </td>
-          </tr>
-          {% empty %}
-          <tr><td colspan="6" class="text-center text-muted">Sin entregas registradas.</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-    <a href="{% url 'deliveries:list' %}" class="btn btn-secondary btn-sm">Ver todas las entregas</a>
+    <a href="{% url 'routes:list' %}" class="btn btn-primary btn-sm mr-2 mb-2"><i class="fas fa-route mr-1"></i>Ruta del Día</a>
+    <a href="{% url 'routes:create' %}" class="btn btn-outline-primary btn-sm mr-2 mb-2"><i class="fas fa-plus mr-1"></i>Nueva Ruta</a>
+    <a href="{% url 'clients:list' %}" class="btn btn-outline-secondary btn-sm mr-2 mb-2"><i class="fas fa-users mr-1"></i>Clientes</a>
+    <a href="{% url 'companies:list' %}" class="btn btn-outline-secondary btn-sm mb-2"><i class="fas fa-building mr-1"></i>Empresas</a>
   </div>
 </div>
-
-{% endblock %}
-
-{% block extra_js %}
-<!-- Chart.js -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
-<script>
-// ── Gráfico de área: últimos 7 días ──────────────────────────
-var histData = {{ ultimos_7 }};
-var labels = histData.map(d => d.fecha);
-var totalData = histData.map(d => d.total_entregas);
-var entregadasData = histData.map(d => d.entregadas);
-var fallidasData = histData.map(d => d.fallidas);
-
-var ctxArea = document.getElementById('myAreaChart');
-if (ctxArea) {
-  new Chart(ctxArea, {
-    type: 'line',
-    data: {
-      labels: labels,
-      datasets: [
-        {
-          label: 'Total', data: totalData,
-          borderColor: '#4e73df', backgroundColor: 'rgba(78,115,223,0.1)',
-          fill: true, tension: 0.3,
-        },
-        {
-          label: 'Entregadas', data: entregadasData,
-          borderColor: '#1cc88a', backgroundColor: 'rgba(28,200,138,0.1)',
-          fill: true, tension: 0.3,
-        },
-        {
-          label: 'Fallidas', data: fallidasData,
-          borderColor: '#e74a3b', backgroundColor: 'rgba(231,74,59,0.1)',
-          fill: true, tension: 0.3,
-        }
-      ]
-    },
-    options: {
-      responsive: true,
-      plugins: { legend: { position: 'top' } },
-      scales: {
-        y: { beginAtZero: true, ticks: { stepSize: 1 } }
-      }
-    }
-  });
-}
-
-// ── Gráfico donut: por estado ──────────────────────────────
-var porEstado = {{ por_estado|safe }};
-var pieLabels = porEstado.map(e => e.estado);
-var pieData = porEstado.map(e => e.total);
-var pieColors = ['#4e73df','#1cc88a','#36b9cc','#f6c23e','#e74a3b','#858796'];
-
-var ctxPie = document.getElementById('myPieChart');
-if (ctxPie) {
-  new Chart(ctxPie, {
-    type: 'doughnut',
-    data: {
-      labels: pieLabels,
-      datasets: [{ data: pieData, backgroundColor: pieColors.slice(0, pieData.length) }]
-    },
-    options: {
-      responsive: true,
-      plugins: { legend: { display: false } },
-      cutout: '80%',
-    }
-  });
-}
-</script>
 {% endblock %}

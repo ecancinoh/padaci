@@ -1,0 +1,269 @@
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+{% block title %}{{ titulo }} – PADACI{% endblock %}
+{% block active_rendiciones %}active{% endblock %}
+
+{% block page_heading %}
+<div class="d-sm-flex align-items-center justify-content-between mb-4">
+  <h1 class="h3 mb-0 text-gray-800"><i class="fas fa-file-invoice-dollar mr-2 text-primary"></i>{{ titulo }}</h1>
+  <a href="{% url 'rendiciones:list' %}" class="btn btn-secondary btn-sm"><i class="fas fa-arrow-left mr-1"></i>Volver</a>
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+  .delete-toggle {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .delete-toggle input[type="checkbox"] {
+    position: absolute;
+    opacity: 0;
+    width: 1px;
+    height: 1px;
+    pointer-events: none;
+  }
+  .delete-toggle .js-delete-label {
+    color: #e74a3b;
+  }
+  .delete-toggle.is-marked .js-delete-label {
+    color: #6c757d;
+  }
+</style>
+
+<form method="post">
+  {% csrf_token %}
+  {% if form.non_field_errors %}
+    <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+  {% endif %}
+  {% if formset_a.non_form_errors %}<div class="alert alert-danger">{{ formset_a.non_form_errors }}</div>{% endif %}
+  {% if formset_b.non_form_errors %}<div class="alert alert-danger">{{ formset_b.non_form_errors }}</div>{% endif %}
+  {% if formset_c.non_form_errors %}<div class="alert alert-danger">{{ formset_c.non_form_errors }}</div>{% endif %}
+  {% if formset_d.non_form_errors %}<div class="alert alert-danger">{{ formset_d.non_form_errors }}</div>{% endif %}
+  {% if formset_e.non_form_errors %}<div class="alert alert-danger">{{ formset_e.non_form_errors }}</div>{% endif %}
+
+  <div class="card shadow mb-4">
+    <div class="card-header py-3"><h6 class="m-0 font-weight-bold text-primary">Datos generales</h6></div>
+    <div class="card-body">
+      <div class="row">
+        <div class="col-lg-6">{{ form.ruta|as_crispy_field }}</div>
+        <div class="col-lg-3">{{ form.fecha|as_crispy_field }}</div>
+        <div class="col-lg-3">{{ form.distribuidora|as_crispy_field }}</div>
+      </div>
+      <div class="row">
+        <div class="col-lg-6">{{ form.nombre_repartidor|as_crispy_field }}</div>
+        <div class="col-lg-6">{{ form.nombre_peoneta|as_crispy_field }}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card shadow mb-4">
+    <div class="card-header py-3"><h6 class="m-0 font-weight-bold text-primary">Resumen monetario</h6></div>
+    <div class="card-body">
+      <div class="row">
+        <div class="col-lg-4">{{ form.estacionamientos|as_crispy_field }}</div>
+        <div class="col-lg-4">{{ form.diferencia_menos|as_crispy_field }}</div>
+        <div class="col-lg-4">{{ form.diferencia_mas|as_crispy_field }}</div>
+      </div>
+      <div class="row">
+        <div class="col-lg-4">{{ form.total_consolidado|as_crispy_field }}</div>
+        <div class="col-lg-4">{{ form.menos_items|as_crispy_field }}</div>
+        <div class="col-lg-4">{{ form.total_dinero_recibir|as_crispy_field }}</div>
+      </div>
+      <div class="row">
+        <div class="col-lg-4">{{ form.facturas_totales|as_crispy_field }}</div>
+        <div class="col-lg-4">{{ form.facturas_entregadas|as_crispy_field }}</div>
+        <div class="col-lg-4">{{ form.facturas_nulas|as_crispy_field }}</div>
+      </div>
+      <div class="row">
+        <div class="col-lg-4">{{ form.kilometraje_inicial|as_crispy_field }}</div>
+        <div class="col-lg-4">{{ form.kilometraje_final|as_crispy_field }}</div>
+        <div class="col-lg-4">{{ form.total_kilometros_recorridos|as_crispy_field }}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card shadow mb-4">
+    <div class="card-header py-3"><h6 class="m-0 font-weight-bold text-primary">Crédito con documentos (A)</h6></div>
+    <div class="card-body p-0">
+      {{ formset_a.management_form }}
+      <table class="table table-bordered table-sm mb-0">
+        <thead class="thead-light"><tr><th>N° factura</th><th>Nombre cliente</th><th>Monto</th><th>Banco</th><th>Quitar</th></tr></thead>
+        <tbody>
+          {% for f in formset_a %}
+          <tr>
+            <td>{% for h in f.hidden_fields %}{{ h }}{% endfor %}{{ f.numero_factura }}</td>
+            <td>{{ f.nombre_cliente }}</td><td>{{ f.monto }}</td><td>{{ f.banco }}</td>
+            <td class="text-center">
+              {% if f.instance.pk %}
+                <span class="delete-toggle" title="Quitar fila">
+                  {{ f.DELETE }}
+                  <label for="{{ f.DELETE.id_for_label }}" class="mb-0 js-delete-label" style="cursor:pointer;">
+                    <i class="fas fa-trash-alt"></i>
+                  </label>
+                </span>
+              {% else %}
+                <span class="text-muted">—</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card shadow mb-4">
+    <div class="card-header py-3"><h6 class="m-0 font-weight-bold text-primary">Devoluciones parciales (B)</h6></div>
+    <div class="card-body p-0">
+      {{ formset_b.management_form }}
+      <table class="table table-bordered table-sm mb-0">
+        <thead class="thead-light"><tr><th>N° factura</th><th>Motivo</th><th>Monto</th><th>Quitar</th></tr></thead>
+        <tbody>
+          {% for f in formset_b %}
+          <tr>
+            <td>{% for h in f.hidden_fields %}{{ h }}{% endfor %}{{ f.numero_factura }}</td>
+            <td>{{ f.motivo }}</td><td>{{ f.monto }}</td>
+            <td class="text-center">
+              {% if f.instance.pk %}
+                <span class="delete-toggle" title="Quitar fila">
+                  {{ f.DELETE }}
+                  <label for="{{ f.DELETE.id_for_label }}" class="mb-0 js-delete-label" style="cursor:pointer;">
+                    <i class="fas fa-trash-alt"></i>
+                  </label>
+                </span>
+              {% else %}
+                <span class="text-muted">—</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card shadow mb-4">
+    <div class="card-header py-3"><h6 class="m-0 font-weight-bold text-primary">Créditos de confianza (C)</h6></div>
+    <div class="card-body p-0">
+      <datalist id="autoriza-clientes-list">
+        {% for nombre_cliente in clientes_ruta_sugeridos %}
+          <option value="{{ nombre_cliente }}"></option>
+        {% endfor %}
+      </datalist>
+      {{ formset_c.management_form }}
+      <table class="table table-bordered table-sm mb-0">
+        <thead class="thead-light"><tr><th>N° factura</th><th>Quién autoriza</th><th>Monto</th><th>Quitar</th></tr></thead>
+        <tbody>
+          {% for f in formset_c %}
+          <tr>
+            <td>{% for h in f.hidden_fields %}{{ h }}{% endfor %}{{ f.numero_factura }}</td>
+            <td>{{ f.autoriza_credito }}</td><td>{{ f.monto }}</td>
+            <td class="text-center">
+              {% if f.instance.pk %}
+                <span class="delete-toggle" title="Quitar fila">
+                  {{ f.DELETE }}
+                  <label for="{{ f.DELETE.id_for_label }}" class="mb-0 js-delete-label" style="cursor:pointer;">
+                    <i class="fas fa-trash-alt"></i>
+                  </label>
+                </span>
+              {% else %}
+                <span class="text-muted">—</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-lg-6">
+      <div class="card shadow mb-4">
+        <div class="card-header py-3"><h6 class="m-0 font-weight-bold text-primary">Facturas nulas (D)</h6></div>
+        <div class="card-body p-0">
+          {{ formset_d.management_form }}
+          <table class="table table-bordered table-sm mb-0">
+            <thead class="thead-light"><tr><th>N° factura</th><th>Monto</th><th>Quitar</th></tr></thead>
+            <tbody>
+              {% for f in formset_d %}
+              <tr>
+                <td>{% for h in f.hidden_fields %}{{ h }}{% endfor %}{{ f.numero_factura }}</td>
+                <td>{{ f.monto }}</td>
+                <td class="text-center">
+                  {% if f.instance.pk %}
+                    <span class="delete-toggle" title="Quitar fila">
+                      {{ f.DELETE }}
+                      <label for="{{ f.DELETE.id_for_label }}" class="mb-0 js-delete-label" style="cursor:pointer;">
+                        <i class="fas fa-trash-alt"></i>
+                      </label>
+                    </span>
+                  {% else %}
+                    <span class="text-muted">—</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-6">
+      <div class="card shadow mb-4">
+        <div class="card-header py-3"><h6 class="m-0 font-weight-bold text-primary">Depósitos o transferencias (E)</h6></div>
+        <div class="card-body p-0">
+          {{ formset_e.management_form }}
+          <table class="table table-bordered table-sm mb-0">
+            <thead class="thead-light"><tr><th>N° factura</th><th>Monto</th><th>Quitar</th></tr></thead>
+            <tbody>
+              {% for f in formset_e %}
+              <tr>
+                <td>{% for h in f.hidden_fields %}{{ h }}{% endfor %}{{ f.numero_factura }}</td>
+                <td>{{ f.monto }}</td>
+                <td class="text-center">
+                  {% if f.instance.pk %}
+                    <span class="delete-toggle" title="Quitar fila">
+                      {{ f.DELETE }}
+                      <label for="{{ f.DELETE.id_for_label }}" class="mb-0 js-delete-label" style="cursor:pointer;">
+                        <i class="fas fa-trash-alt"></i>
+                      </label>
+                    </span>
+                  {% else %}
+                    <span class="text-muted">—</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="text-right mb-4">
+    <button type="submit" class="btn btn-primary"><i class="fas fa-save mr-1"></i>Guardar rendición</button>
+    <a href="{% url 'rendiciones:list' %}" class="btn btn-secondary">Cancelar</a>
+  </div>
+</form>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.delete-toggle').forEach(function (wrap) {
+      const checkbox = wrap.querySelector('input[type="checkbox"]');
+      if (!checkbox) return;
+
+      const sync = function () {
+        wrap.classList.toggle('is-marked', checkbox.checked);
+      };
+
+      checkbox.addEventListener('change', sync);
+      sync();
+    });
+  });
+</script>
+{% endblock %}

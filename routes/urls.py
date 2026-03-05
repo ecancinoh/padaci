@@ -5,6 +5,13 @@ app_name = 'routes'
 
 urlpatterns = [
     path('', views.RutaListView.as_view(), name='list'),
+    path('entregas/', views.EntregaRutaListView.as_view(), name='entregas_list'),
+    path('entregas/nueva/', views.EntregaRutaCreateView.as_view(), name='entregas_create'),
+    path('entregas/<int:pk>/', views.EntregaRutaDetailView.as_view(), name='entregas_detail'),
+    path('entregas/<int:pk>/editar/', views.EntregaRutaUpdateView.as_view(), name='entregas_update'),
+    path('entregas/<int:pk>/eliminar/', views.EntregaRutaDeleteView.as_view(), name='entregas_delete'),
+    path('entregas/<int:pk>/estado/', views.entrega_actualizar_estado, name='entregas_update_estado'),
+    path('entregas/eliminar-masiva/', views.entregas_eliminar_masiva, name='entregas_eliminar_masiva'),
     path('nueva/', views.RutaCreateView.as_view(), name='create'),
     path('<int:pk>/', views.RutaDetailView.as_view(), name='detail'),
     path('<int:pk>/editar/', views.RutaUpdateView.as_view(), name='update'),

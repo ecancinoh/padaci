@@ -9,6 +9,7 @@ class CustomUser(AbstractUser):
         ('admin', 'Administrador'),
         ('supervisor', 'Supervisor'),
         ('conductor', 'Conductor'),
+        ('peoneta', 'Peoneta'),
         ('operador', 'Operador'),
     ]
 

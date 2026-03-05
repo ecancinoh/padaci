@@ -1,14 +1,14 @@
 {% extends 'base.html' %}
 {% load crispy_forms_tags %}
 {% block title %}Actualizar Estado – {{ entrega.cliente }} – PADACI{% endblock %}
-{% block active_deliveries %}active{% endblock %}
+{% block active_routes %}active{% endblock %}
 
 {% block page_heading %}
 <div class="d-sm-flex align-items-center justify-content-between mb-4">
   <h1 class="h3 mb-0 text-gray-800">
     <i class="fas fa-sync mr-2 text-success"></i>Actualizar Estado – {{ entrega.cliente }}
   </h1>
-  <a href="{% url 'deliveries:detail' entrega.pk %}" class="btn btn-secondary btn-sm"><i class="fas fa-arrow-left mr-1"></i> Volver</a>
+  <a href="{% url 'routes:entregas_detail' entrega.pk %}" class="btn btn-secondary btn-sm"><i class="fas fa-arrow-left mr-1"></i> Volver</a>
 </div>
 {% endblock %}
 
@@ -23,7 +23,7 @@
           {{ form|crispy }}
           <hr>
           <button type="submit" class="btn btn-success"><i class="fas fa-check mr-1"></i> Guardar Estado</button>
-          <a href="{% url 'deliveries:detail' entrega.pk %}" class="btn btn-secondary ml-2">Cancelar</a>
+          <a href="{% url 'routes:entregas_detail' entrega.pk %}" class="btn btn-secondary ml-2">Cancelar</a>
         </form>
       </div>
     </div>
