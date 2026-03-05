@@ -153,7 +153,11 @@ FORMAT_MODULE_PATH = ['padaci.formats']
 STATIC_URL = '/static/'
 STATICFILES_DIRS = [BASE_DIR / 'static']
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+# Manifest storage can raise 500 if collectstatic output is stale/missing in shared hosting.
+STATICFILES_STORAGE = config(
+    'STATICFILES_STORAGE',
+    default='whitenoise.storage.CompressedStaticFilesStorage',
+)
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'

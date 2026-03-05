@@ -131,11 +131,11 @@ try:
         if "testserver" not in hosts:
             hosts.append("testserver")
 
-        with override_settings(ALLOWED_HOSTS=hosts):
+        with override_settings(ALLOWED_HOSTS=hosts, SECURE_SSL_REDIRECT=False):
             client = Client()
             for path in ["/", "/accounts/login/", "/admin/"]:
                 try:
-                    response = client.get(path)
+                    response = client.get(path, follow=True)
                     out(f"REQ {path} => status={response.status_code}")
                 except Exception:
                     out(f"FAIL request {path}")
