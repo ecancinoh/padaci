@@ -30,7 +30,8 @@
     <ul class="navbar-nav bg-gradient-primary sidebar sidebar-dark accordion" id="accordionSidebar">
 
       <!-- Brand -->
-      <a class="sidebar-brand d-flex align-items-center justify-content-center" href="{% url 'dashboard:index' %}">
+      {% url 'dashboard:index' as url_dashboard_index %}
+      <a class="sidebar-brand d-flex align-items-center justify-content-center" href="{{ url_dashboard_index|default:'#' }}">
         <div class="sidebar-brand-icon rotate-n-15">
           <i class="fas fa-truck"></i>
         </div>
@@ -41,7 +42,7 @@
 
       <!-- Dashboard -->
       <li class="nav-item {% block active_dashboard %}{% endblock %}">
-        <a class="nav-link" href="{% url 'dashboard:index' %}">
+        <a class="nav-link" href="{{ url_dashboard_index|default:'#' }}">
           <i class="fas fa-fw fa-tachometer-alt"></i>
           <span>Dashboard</span>
         </a>
@@ -52,7 +53,8 @@
 
       <!-- Usuarios -->
       <li class="nav-item {% block active_accounts %}{% endblock %}">
-        <a class="nav-link" href="{% url 'accounts:list' %}">
+        {% url 'accounts:list' as url_accounts_list %}
+        <a class="nav-link" href="{{ url_accounts_list|default:'#' }}">
           <i class="fas fa-fw fa-users"></i>
           <span>Usuarios</span>
         </a>
@@ -60,7 +62,8 @@
 
       <!-- Empresas -->
       <li class="nav-item {% block active_companies %}{% endblock %}">
-        <a class="nav-link" href="{% url 'companies:list' %}">
+        {% url 'companies:list' as url_companies_list %}
+        <a class="nav-link" href="{{ url_companies_list|default:'#' }}">
           <i class="fas fa-fw fa-building"></i>
           <span>Empresas</span>
         </a>
@@ -68,7 +71,8 @@
 
       <!-- Clientes -->
       <li class="nav-item {% block active_clients %}{% endblock %}">
-        <a class="nav-link" href="{% url 'clients:list' %}">
+        {% url 'clients:list' as url_clients_list %}
+        <a class="nav-link" href="{{ url_clients_list|default:'#' }}">
           <i class="fas fa-fw fa-address-book"></i>
           <span>Clientes</span>
         </a>
@@ -79,14 +83,16 @@
 
       <!-- Ruta del Día -->
       <li class="nav-item {% block active_routes %}{% endblock %}">
-        <a class="nav-link" href="{% url 'routes:list' %}">
+        {% url 'routes:list' as url_routes_list %}
+        <a class="nav-link" href="{{ url_routes_list|default:'#' }}">
           <i class="fas fa-fw fa-route"></i>
           <span>Ruta del Día</span>
         </a>
       </li>
 
       <li class="nav-item {% block active_rendiciones %}{% endblock %}">
-        <a class="nav-link" href="{% url 'rendiciones:list' %}">
+        {% url 'rendiciones:list' as url_rendiciones_list %}
+        <a class="nav-link" href="{{ url_rendiciones_list|default:'#' }}">
           <i class="fas fa-fw fa-file-invoice-dollar"></i>
           <span>Rendiciones</span>
         </a>
@@ -94,7 +100,8 @@
 
       <!-- Historial -->
       <li class="nav-item {% block active_history %}{% endblock %}">
-        <a class="nav-link" href="{% url 'history:list' %}">
+        {% url 'history:list' as url_history_list %}
+        <a class="nav-link" href="{{ url_history_list|default:'#' }}">
           <i class="fas fa-fw fa-history"></i>
           <span>Historial</span>
         </a>
@@ -105,7 +112,8 @@
 
       <!-- Mapa -->
       <li class="nav-item {% block active_maps %}{% endblock %}">
-        <a class="nav-link" href="{% url 'maps:mapa' %}">
+        {% url 'maps:mapa' as url_maps_mapa %}
+        <a class="nav-link" href="{{ url_maps_mapa|default:'#' }}">
           <i class="fas fa-fw fa-map-marked-alt"></i>
           <span>Mapa Chile</span>
         </a>
@@ -154,11 +162,13 @@
                 <div class="dropdown-header">
                   <strong>{{ user.get_rol_display }}</strong>
                 </div>
-                <a class="dropdown-item" href="{% url 'accounts:detail' user.pk %}">
+                {% url 'accounts:detail' user.pk as url_accounts_detail %}
+                <a class="dropdown-item" href="{{ url_accounts_detail|default:'#' }}">
                   <i class="fas fa-user fa-sm fa-fw mr-2 text-gray-400"></i> Mi Perfil
                 </a>
                 <div class="dropdown-divider"></div>
-                <a class="dropdown-item" href="{% url 'accounts:logout' %}">
+                {% url 'accounts:logout' as url_accounts_logout %}
+                <a class="dropdown-item" href="{{ url_accounts_logout|default:'#' }}">
                   <i class="fas fa-sign-out-alt fa-sm fa-fw mr-2 text-gray-400"></i> Cerrar Sesión
                 </a>
               </div>
