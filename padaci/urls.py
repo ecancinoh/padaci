@@ -22,8 +22,14 @@ urlpatterns = [
     path('historial/', include('history.urls', namespace='history')),
     path('mapa/', include('maps.urls', namespace='maps')),
     path('rutas/', include('routes.urls', namespace='routes')),
-    path('rendiciones/', include('rendiciones.urls', namespace='rendiciones')),
 ]
+
+# If optional dependencies for rendiciones are missing in hosting, keep the rest
+# of the site available instead of failing URLConf import with a global 500.
+try:
+    urlpatterns.append(path('rendiciones/', include('rendiciones.urls', namespace='rendiciones')))
+except Exception:
+    pass
 
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

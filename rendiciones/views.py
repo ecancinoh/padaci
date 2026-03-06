@@ -9,9 +9,15 @@ from django.http import HttpResponse, FileResponse, Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
 from django.views.generic import ListView, DetailView, DeleteView
-from openpyxl import load_workbook
 from .forms import RendicionRepartoForm, build_formsets, get_clientes_ruta_nombres
 from .models import RendicionReparto
+
+
+def _load_openpyxl():
+    """Lazy import so app startup doesn't depend on openpyxl being installed."""
+    from openpyxl import load_workbook
+
+    return load_workbook
 
 
 def _load_reportlab():
@@ -84,6 +90,15 @@ def plantilla_excel(request):
 
 @login_required
 def rendicion_excel(request, pk):
+    try:
+        load_workbook = _load_openpyxl()
+    except Exception:
+        messages.error(
+            request,
+            'La exportacion Excel no esta disponible en este entorno. Falta instalar la dependencia openpyxl.',
+        )
+        return redirect('rendiciones:detail', pk=pk)
+
     rendicion = get_object_or_404(
         RendicionReparto.objects.select_related('ruta__conductor', 'ruta__empresa').prefetch_related(
             'creditos_documentos',
