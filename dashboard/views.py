@@ -1,4 +1,5 @@
 from django.contrib.auth.decorators import login_required
+from django.contrib import messages
 from django.shortcuts import render
 from django.utils import timezone
 from django.db.utils import OperationalError
@@ -34,6 +35,12 @@ def index(request):
     _write_dashboard_probe('dashboard_index_start.log', 'dashboard index view STARTED')
     """Dashboard principal enfocado en resumen operativo general."""
     try:
+        if request.GET.get('db_migration_pending'):
+            messages.warning(
+                request,
+                'La base de datos del hosting esta desactualizada. Ejecuta: python manage.py migrate routes',
+            )
+
         hoy = timezone.localdate()
 
         total_clientes = Cliente.objects.filter(activo=True).count()

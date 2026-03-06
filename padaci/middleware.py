@@ -1,8 +1,7 @@
 import traceback
 from pathlib import Path
-from django.contrib import messages
 from django.db.utils import OperationalError, ProgrammingError
-from django.shortcuts import redirect
+from django.http import HttpResponseRedirect
 
 
 class ExceptionFileLoggingMiddleware:
@@ -17,12 +16,9 @@ class ExceptionFileLoggingMiddleware:
         except (OperationalError, ProgrammingError) as exc:
             if self._is_pending_routes_migration_error(exc):
                 self._write_log(request)
-                messages.error(
-                    request,
-                    'La base de datos del hosting esta desactualizada (falta migracion de rutas). '
-                    'Ejecuta: python manage.py migrate routes',
-                )
-                return redirect('dashboard:index')
+                # Avoid django.contrib.messages here because this middleware
+                # runs before Session/Message middleware in settings.
+                return HttpResponseRedirect('/dashboard/?db_migration_pending=1')
             self._write_log(request)
             raise
         except Exception:
@@ -45,6 +41,7 @@ class ExceptionFileLoggingMiddleware:
 
         log_paths = [
             base_dir / "tmp" / "runtime_errors.log",
+            base_dir / "tmp" / "padaci_runtime_errors.log",
             base_dir / "runtime_errors.log",
             Path("/tmp/padaci_runtime_errors.log"),
         ]
