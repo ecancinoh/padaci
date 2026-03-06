@@ -5,6 +5,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db.models import Sum
+from django.db.utils import OperationalError
 from django.http import HttpResponse, FileResponse, Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
@@ -59,6 +60,19 @@ class RendicionListView(LoginRequiredMixin, ListView):
         if repartidor:
             qs = qs.filter(nombre_repartidor__icontains=repartidor)
         return qs
+
+    def get(self, request, *args, **kwargs):
+        try:
+            return super().get(request, *args, **kwargs)
+        except OperationalError as exc:
+            if "routes_rutadia.peoneta_id" in str(exc):
+                messages.error(
+                    request,
+                    'La base de datos del hosting esta desactualizada (falta migracion de rutas). '
+                    'Ejecuta: python manage.py migrate routes',
+                )
+                return redirect('dashboard:index')
+            raise
 
 
 class RendicionDetailView(LoginRequiredMixin, DetailView):

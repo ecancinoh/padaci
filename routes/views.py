@@ -9,6 +9,7 @@ from django.urls import reverse_lazy
 from django.shortcuts import get_object_or_404, redirect, render
 from django.http import JsonResponse
 from django.db.models import Q
+from django.db.utils import OperationalError
 from django.utils import timezone
 from .models import RutaDia, ParadaRuta, Entrega
 from .forms import RutaDiaForm, EntregaForm, EntregaEstadoForm
@@ -273,6 +274,19 @@ class RutaListView(LoginRequiredMixin, ListView):
         if conductor:
             qs = qs.filter(conductor_id=conductor)
         return qs
+
+    def get(self, request, *args, **kwargs):
+        try:
+            return super().get(request, *args, **kwargs)
+        except OperationalError as exc:
+            if "routes_rutadia.peoneta_id" in str(exc):
+                messages.error(
+                    request,
+                    'La base de datos del hosting esta desactualizada (falta migracion de rutas). '
+                    'Ejecuta: python manage.py migrate routes',
+                )
+                return redirect('dashboard:index')
+            raise
 
 
 class RutaCreateView(LoginRequiredMixin, CreateView):
