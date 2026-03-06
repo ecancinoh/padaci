@@ -5,7 +5,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db.models import Sum
-from django.db.utils import OperationalError
+from django.db.utils import OperationalError, ProgrammingError
 from django.http import HttpResponse, FileResponse, Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
@@ -64,8 +64,9 @@ class RendicionListView(LoginRequiredMixin, ListView):
     def get(self, request, *args, **kwargs):
         try:
             return super().get(request, *args, **kwargs)
-        except OperationalError as exc:
-            if "routes_rutadia.peoneta_id" in str(exc):
+        except (OperationalError, ProgrammingError) as exc:
+            text = str(exc).lower()
+            if 'peoneta_id' in text or 'routes_rutadia' in text:
                 messages.error(
                     request,
                     'La base de datos del hosting esta desactualizada (falta migracion de rutas). '

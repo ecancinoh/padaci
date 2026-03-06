@@ -1,5 +1,8 @@
 import traceback
 from pathlib import Path
+from django.contrib import messages
+from django.db.utils import OperationalError, ProgrammingError
+from django.shortcuts import redirect
 
 
 class ExceptionFileLoggingMiddleware:
@@ -11,9 +14,24 @@ class ExceptionFileLoggingMiddleware:
     def __call__(self, request):
         try:
             return self.get_response(request)
+        except (OperationalError, ProgrammingError) as exc:
+            if self._is_pending_routes_migration_error(exc):
+                self._write_log(request)
+                messages.error(
+                    request,
+                    'La base de datos del hosting esta desactualizada (falta migracion de rutas). '
+                    'Ejecuta: python manage.py migrate routes',
+                )
+                return redirect('dashboard:index')
+            self._write_log(request)
+            raise
         except Exception:
             self._write_log(request)
             raise
+
+    def _is_pending_routes_migration_error(self, exc: Exception) -> bool:
+        text = str(exc).lower()
+        return 'peoneta_id' in text or 'routes_rutadia' in text
 
     def _write_log(self, request) -> None:
         base_dir = Path(__file__).resolve().parent.parent
