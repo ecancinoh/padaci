@@ -8,16 +8,29 @@ from accounts.models import CustomUser
 
 
 import traceback
-import os
+from pathlib import Path
+
+
+def _write_dashboard_probe(filename, message):
+    base_dir = Path(__file__).resolve().parents[1]
+    candidates = [
+        base_dir / 'tmp' / filename,
+        base_dir / filename,
+        Path('/tmp') / filename,
+    ]
+    for path in candidates:
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with path.open('a', encoding='utf-8') as f:
+                f.write(message + '\n')
+            return
+        except Exception:
+            continue
 
 @login_required
 def index(request):
     # Log at the very start of the view
-    try:
-        with open('/tmp/dashboard_index_start.log', 'a', encoding='utf-8') as f:
-            f.write('dashboard index view STARTED\n')
-    except Exception:
-        pass
+    _write_dashboard_probe('dashboard_index_start.log', 'dashboard index view STARTED')
     """Dashboard principal enfocado en resumen operativo general."""
     try:
         hoy = timezone.localdate()
@@ -36,13 +49,7 @@ def index(request):
             'ruta_hoy': ruta_hoy,
         }
         return render(request, 'dashboard/index.html', ctx)
-    except Exception as e:
-        # Log error to /tmp/dashboard_index_error.log
-        try:
-            with open('/tmp/dashboard_index_error.log', 'a', encoding='utf-8') as f:
-                f.write(f"--- Exception in dashboard index view ---\n")
-                f.write(traceback.format_exc())
-                f.write("\n")
-        except Exception:
-            pass
+    except Exception:
+        _write_dashboard_probe('dashboard_index_error.log', '--- Exception in dashboard index view ---')
+        _write_dashboard_probe('dashboard_index_error.log', traceback.format_exc())
         raise
