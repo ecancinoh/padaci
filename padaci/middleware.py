@@ -27,7 +27,12 @@ class ExceptionFileLoggingMiddleware:
 
     def _is_pending_routes_migration_error(self, exc: Exception) -> bool:
         text = str(exc).lower()
-        return 'peoneta_id' in text or 'routes_rutadia' in text
+        return (
+            'peoneta_id' in text
+            or 'routes_rutadia' in text
+            or 'rendiciones_rendicionreparto' in text
+            or ("doesn't exist" in text and 'rendiciones_' in text)
+        )
 
     def _write_log(self, request) -> None:
         base_dir = Path(__file__).resolve().parent.parent

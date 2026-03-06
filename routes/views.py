@@ -300,11 +300,16 @@ class RutaListView(LoginRequiredMixin, ListView):
         except (OperationalError, ProgrammingError) as exc:
             text = str(exc).lower()
             _write_routes_log('routes_list_error.log', traceback.format_exc())
-            if 'peoneta_id' in text or 'routes_rutadia' in text:
+            if (
+                'peoneta_id' in text
+                or 'routes_rutadia' in text
+                or 'rendiciones_rendicionreparto' in text
+                or ("doesn't exist" in text and 'rendiciones_' in text)
+            ):
                 messages.error(
                     request,
-                    'La base de datos del hosting esta desactualizada (falta migracion de rutas). '
-                    'Ejecuta: python manage.py migrate routes',
+                    'La base de datos del hosting esta desactualizada (faltan migraciones). '
+                    'Ejecuta: python manage.py migrate',
                 )
                 return redirect('dashboard:index')
             raise
