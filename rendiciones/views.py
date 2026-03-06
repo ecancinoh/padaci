@@ -1,6 +1,7 @@
 from io import BytesIO
 from decimal import Decimal
 from pathlib import Path
+import traceback
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -12,6 +13,23 @@ from django.urls import reverse_lazy
 from django.views.generic import ListView, DetailView, DeleteView
 from .forms import RendicionRepartoForm, build_formsets, get_clientes_ruta_nombres
 from .models import RendicionReparto
+
+
+def _write_rendiciones_log(filename, payload):
+    base_dir = Path(__file__).resolve().parents[1]
+    candidates = [
+        base_dir / 'tmp' / filename,
+        base_dir / filename,
+        Path('/tmp') / filename,
+    ]
+    for path in candidates:
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with path.open('a', encoding='utf-8') as f:
+                f.write(payload + '\n')
+            return
+        except Exception:
+            continue
 
 
 def _load_openpyxl():
@@ -66,6 +84,7 @@ class RendicionListView(LoginRequiredMixin, ListView):
             return super().get(request, *args, **kwargs)
         except (OperationalError, ProgrammingError) as exc:
             text = str(exc).lower()
+            _write_rendiciones_log('rendiciones_list_error.log', traceback.format_exc())
             if 'peoneta_id' in text or 'routes_rutadia' in text:
                 messages.error(
                     request,
@@ -74,6 +93,13 @@ class RendicionListView(LoginRequiredMixin, ListView):
                 )
                 return redirect('dashboard:index')
             raise
+        except Exception:
+            _write_rendiciones_log('rendiciones_list_error.log', traceback.format_exc())
+            messages.error(
+                request,
+                'Ocurrio un error al abrir Rendiciones. Revisa tmp/rendiciones_list_error.log para el detalle.',
+            )
+            return redirect('dashboard:index')
 
 
 class RendicionDetailView(LoginRequiredMixin, DetailView):

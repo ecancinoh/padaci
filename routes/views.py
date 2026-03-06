@@ -1,6 +1,8 @@
 import json
 import math
 import uuid
+import traceback
+from pathlib import Path
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
@@ -14,6 +16,23 @@ from django.utils import timezone
 from .models import RutaDia, ParadaRuta, Entrega
 from .forms import RutaDiaForm, EntregaForm, EntregaEstadoForm
 from clients.models import Cliente
+
+
+def _write_routes_log(filename, payload):
+    base_dir = Path(__file__).resolve().parents[1]
+    candidates = [
+        base_dir / 'tmp' / filename,
+        base_dir / filename,
+        Path('/tmp') / filename,
+    ]
+    for path in candidates:
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with path.open('a', encoding='utf-8') as f:
+                f.write(payload + '\n')
+            return
+        except Exception:
+            continue
 
 
 class EntregaRutaListView(LoginRequiredMixin, ListView):
@@ -280,6 +299,7 @@ class RutaListView(LoginRequiredMixin, ListView):
             return super().get(request, *args, **kwargs)
         except (OperationalError, ProgrammingError) as exc:
             text = str(exc).lower()
+            _write_routes_log('routes_list_error.log', traceback.format_exc())
             if 'peoneta_id' in text or 'routes_rutadia' in text:
                 messages.error(
                     request,
@@ -288,6 +308,13 @@ class RutaListView(LoginRequiredMixin, ListView):
                 )
                 return redirect('dashboard:index')
             raise
+        except Exception:
+            _write_routes_log('routes_list_error.log', traceback.format_exc())
+            messages.error(
+                request,
+                'Ocurrio un error al abrir Ruta del dia. Revisa tmp/routes_list_error.log para el detalle.',
+            )
+            return redirect('dashboard:index')
 
 
 class RutaCreateView(LoginRequiredMixin, CreateView):
