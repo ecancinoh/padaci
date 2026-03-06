@@ -1,6 +1,7 @@
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render
 from django.utils import timezone
+from django.db.utils import OperationalError
 from clients.models import Cliente
 from companies.models import Empresa
 from routes.models import RutaDia
@@ -39,7 +40,18 @@ def index(request):
         total_empresas = Empresa.objects.filter(activa=True).count()
         total_conductores = CustomUser.objects.filter(rol='conductor', activo=True).count()
 
-        ruta_hoy = RutaDia.objects.filter(fecha=hoy).select_related('conductor').first()
+        ruta_hoy = None
+        try:
+            ruta_hoy = RutaDia.objects.filter(fecha=hoy).select_related('conductor').first()
+        except OperationalError as db_error:
+            # Temporary compatibility path when hosting DB is behind migrations.
+            if "routes_rutadia.peoneta_id" in str(db_error):
+                _write_dashboard_probe(
+                    'dashboard_index_error.log',
+                    'RutaDia query skipped: missing column routes_rutadia.peoneta_id. Run migrations on hosting.',
+                )
+            else:
+                raise
 
         ctx = {
             'hoy': hoy,
