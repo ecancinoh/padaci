@@ -8,6 +8,27 @@ if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
 
 
+def _write_probe(message: str) -> None:
+    for path in [
+        os.path.join(BASE_DIR, "tmp", "wsgi_probe.log"),
+        os.path.join(BASE_DIR, "wsgi_probe.log"),
+        "/tmp/padaci_wsgi_probe.log",
+    ]:
+        try:
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "a", encoding="utf-8") as probe:
+                probe.write(message + "\n")
+            break
+        except Exception:
+            continue
+
+
+def _fallback_application(environ, start_response):
+    body = b"PADACI Python entrypoint fallback active. Check /tmp/padaci_passenger_wsgi_error.log"
+    start_response("503 Service Unavailable", [("Content-Type", "text/plain"), ("Content-Length", str(len(body)))])
+    return [body]
+
+
 def _add_venv_site_packages() -> None:
     patterns = [
         os.path.join(BASE_DIR, "venv", "lib", "python*", "site-packages"),
@@ -39,12 +60,14 @@ def _write_startup_error(exc_text: str) -> None:
 
 
 try:
-	_add_venv_site_packages()
-	os.environ.setdefault("DJANGO_SETTINGS_MODULE", "padaci.settings")
+    _write_probe("python entrypoint loaded")
+    _add_venv_site_packages()
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "padaci.settings")
 
-	from django.core.wsgi import get_wsgi_application
+    from django.core.wsgi import get_wsgi_application
 
-	application = get_wsgi_application()
+    application = get_wsgi_application()
 except Exception:
-	_write_startup_error(traceback.format_exc())
-	raise
+    _write_startup_error(traceback.format_exc())
+    _write_probe("python entrypoint failed; fallback application enabled")
+    application = _fallback_application
