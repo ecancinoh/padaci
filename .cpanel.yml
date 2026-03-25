@@ -2,10 +2,14 @@
 deployment:
   tasks:
     - export DEPLOYPATH=/home/padacicl/repositories/padaci
+    - export PUBLICPATH=/home/padacicl/public_html
     - if [ -x /home/padacicl/virtualenv/repositories/padaci/3.11/bin/python ]; then export PYBIN=/home/padacicl/virtualenv/repositories/padaci/3.11/bin/python; elif [ -x /home/padacicl/virtualenv/padaci/3.11/bin/python ]; then export PYBIN=/home/padacicl/virtualenv/padaci/3.11/bin/python; else echo "No se encontró Python del virtualenv"; exit 1; fi
     - $PYBIN -m pip install --upgrade pip
     - $PYBIN -m pip install -r $DEPLOYPATH/requirements.txt
     - $PYBIN $DEPLOYPATH/manage.py migrate --noinput
     - $PYBIN $DEPLOYPATH/manage.py collectstatic --noinput
+    - mkdir -p $DEPLOYPATH/media
+    - if [ -d $PUBLICPATH ] && [ -d $PUBLICPATH/media ] && [ ! -L $PUBLICPATH/media ]; then cp -a $PUBLICPATH/media/. $DEPLOYPATH/media/; fi
+    - if [ -d $PUBLICPATH ]; then ln -sfn $DEPLOYPATH/media $PUBLICPATH/media; fi
     - mkdir -p $DEPLOYPATH/tmp
     - touch $DEPLOYPATH/tmp/restart.txt
