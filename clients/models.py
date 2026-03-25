@@ -32,6 +32,11 @@ class Cliente(models.Model):
 
     notas = models.TextField(blank=True, null=True, verbose_name='Notas')
     observaciones = models.TextField(blank=True, default='', verbose_name='Observaciones', help_text='Indicaciones especiales de entrega, acceso, horarios, etc.')
+    tiempo_estimado_atencion = models.PositiveIntegerField(
+        default=10,
+        verbose_name='Tiempo estimado de atencion (min)',
+        help_text='Minutos estimados para atender este cliente en una visita.',
+    )
     activo = models.BooleanField(default=True, verbose_name='Activo')
     fecha_creacion = models.DateTimeField(auto_now_add=True)
     fecha_actualizacion = models.DateTimeField(auto_now=True)

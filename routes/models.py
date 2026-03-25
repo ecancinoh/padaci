@@ -16,6 +16,14 @@ class Entrega(models.Model):
         ('devuelto', 'Devuelto'),
     ]
 
+    ESTADO_PAGO_CHOICES = [
+        ('pendiente', 'Pendiente'),
+        ('pagado_completo', 'Pagado completo'),
+        ('pagado_parcial', 'Pagado parcial'),
+        ('sin_pago', 'Sin pago'),
+        ('credito', 'Credito'),
+    ]
+
     cliente = models.ForeignKey(
         Cliente,
         on_delete=models.PROTECT,
@@ -46,6 +54,25 @@ class Entrega(models.Model):
     fecha_entrega = models.DateTimeField(null=True, blank=True, verbose_name='Fecha/Hora Entrega Real')
     observacion = models.TextField(blank=True, null=True, verbose_name='Observación')
     foto_evidencia = models.ImageField(upload_to='entregas/evidencia/', blank=True, null=True, verbose_name='Foto Evidencia')
+    estado_pago = models.CharField(
+        max_length=20,
+        choices=ESTADO_PAGO_CHOICES,
+        default='pendiente',
+        verbose_name='Estado de pago',
+    )
+    pago_registrado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='entregas_pago_registradas',
+        verbose_name='Pago registrado por',
+    )
+    fecha_registro_pago = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name='Fecha registro pago',
+    )
 
     fecha_creacion = models.DateTimeField(auto_now_add=True)
     fecha_actualizacion = models.DateTimeField(auto_now=True)
@@ -61,6 +88,70 @@ class Entrega(models.Model):
 
     def esta_completada(self):
         return self.estado == 'entregado'
+
+    @property
+    def total_pagado(self):
+        total = self.pagos.aggregate(total=models.Sum('monto'))['total']
+        return total or 0
+
+
+class EntregaPago(models.Model):
+    """Linea de pago individual asociada a una entrega."""
+
+    METODO_CHOICES = [
+        ('efectivo', 'Efectivo'),
+        ('cheque', 'Cheque'),
+        ('credito', 'Credito'),
+        ('transferencia', 'Transferencia'),
+    ]
+
+    entrega = models.ForeignKey(
+        Entrega,
+        on_delete=models.CASCADE,
+        related_name='pagos',
+        verbose_name='Entrega',
+    )
+    metodo = models.CharField(
+        max_length=15,
+        choices=METODO_CHOICES,
+        verbose_name='Metodo de pago',
+    )
+    monto = models.DecimalField(
+        max_digits=14,
+        decimal_places=0,
+        default=0,
+        verbose_name='Monto',
+    )
+    tiene_documento_credito = models.BooleanField(
+        default=False,
+        verbose_name='Credito con documento',
+        help_text='Solo aplica para pagos con metodo credito.',
+    )
+    observacion = models.CharField(
+        max_length=240,
+        blank=True,
+        verbose_name='Observacion pago',
+    )
+    registrado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='lineas_pago_entrega_registradas',
+        verbose_name='Registrado por',
+    )
+    fecha_registro = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name='Fecha registro',
+    )
+
+    class Meta:
+        verbose_name = 'Linea de pago de entrega'
+        verbose_name_plural = 'Lineas de pago de entrega'
+        ordering = ['id']
+
+    def __str__(self):
+        return f'{self.entrega_id} - {self.get_metodo_display()} - {self.monto}'
 
 
 class RutaDia(models.Model):

@@ -45,11 +45,12 @@ COMUNAS_VI_REGION = [
 class ClienteForm(forms.ModelForm):
     class Meta:
         model = Cliente
-        fields = ['nombre', 'comuna', 'latitud', 'longitud', 'observaciones']
+        fields = ['nombre', 'comuna', 'latitud', 'longitud', 'tiempo_estimado_atencion', 'observaciones']
         widgets = {
             'comuna': forms.Select(choices=COMUNAS_VI_REGION),
             'latitud': forms.NumberInput(attrs={'step': 'any', 'placeholder': 'Ej: -33.456789'}),
             'longitud': forms.NumberInput(attrs={'step': 'any', 'placeholder': 'Ej: -70.654321'}),
+            'tiempo_estimado_atencion': forms.NumberInput(attrs={'min': 1, 'placeholder': 'Minutos', 'value': 10}),
             'observaciones': forms.Textarea(attrs={'rows': 3, 'placeholder': 'Ej: Dejar en portería, llamar antes de llegar, acceso por calle lateral...'}),
         }
 

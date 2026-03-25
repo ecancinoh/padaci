@@ -90,6 +90,14 @@
         </a>
       </li>
 
+      <li class="nav-item {% block active_planner %}{% endblock %}">
+        {% url 'planner:list' as url_planner_list %}
+        <a class="nav-link" href="{{ url_planner_list|default:'#' }}">
+          <i class="fas fa-fw fa-calendar-week"></i>
+          <span>Planificación Semanal</span>
+        </a>
+      </li>
+
       <li class="nav-item {% block active_rendiciones %}{% endblock %}">
         {% url 'rendiciones:list' as url_rendiciones_list %}
         <a class="nav-link" href="{{ url_rendiciones_list|default:'#' }}">

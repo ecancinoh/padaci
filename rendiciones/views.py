@@ -15,6 +15,153 @@ from .forms import RendicionRepartoForm, build_formsets, get_clientes_ruta_nombr
 from .models import RendicionReparto
 
 
+def _build_autocompletado_desde_ruta(ruta):
+    sugeridos = {
+        'a': [],
+        'b': [],
+        'c': [],
+        'd': [],
+        'e': [],
+    }
+    resumen = {
+        'total_items': 0,
+        'paradas': 0,
+        'entregas': 0,
+        'pagos': 0,
+    }
+
+    if not ruta:
+        return sugeridos, resumen
+
+    from routes.models import ParadaRuta
+
+    paradas = (
+        ParadaRuta.objects.filter(ruta=ruta)
+        .select_related('entrega__cliente')
+        .prefetch_related('entrega__pagos')
+        .order_by('orden', 'id')
+    )
+
+    seen = {clave: set() for clave in sugeridos.keys()}
+
+    for parada in paradas:
+        resumen['paradas'] += 1
+        if not parada.entrega:
+            continue
+
+        entrega = parada.entrega
+        cliente = entrega.cliente
+        numero_ref = str(entrega.pk)
+        resumen['entregas'] += 1
+
+        if entrega.estado in {'fallido', 'devuelto'}:
+            key = (numero_ref, Decimal('0'))
+            if key not in seen['d']:
+                sugeridos['d'].append({
+                    'numero_factura': numero_ref,
+                    'monto': Decimal('0'),
+                })
+                seen['d'].add(key)
+
+        for pago in entrega.pagos.all():
+            resumen['pagos'] += 1
+            monto = pago.monto or Decimal('0')
+            if monto <= 0:
+                continue
+
+            if pago.metodo == 'cheque':
+                key = (numero_ref, cliente.nombre, monto)
+                if key not in seen['a']:
+                    sugeridos['a'].append({
+                        'numero_factura': numero_ref,
+                        'nombre_cliente': cliente.nombre,
+                        'monto': monto,
+                        'banco': '',
+                    })
+                    seen['a'].add(key)
+                continue
+
+            if pago.metodo == 'credito':
+                key = (numero_ref, cliente.nombre, monto)
+                if key not in seen['c']:
+                    sugeridos['c'].append({
+                        'numero_factura': numero_ref,
+                        'autoriza_credito': cliente.nombre,
+                        'monto': monto,
+                    })
+                    seen['c'].add(key)
+                continue
+
+            if pago.metodo == 'transferencia':
+                key = (numero_ref, monto)
+                if key not in seen['e']:
+                    sugeridos['e'].append({
+                        'numero_factura': numero_ref,
+                        'monto': monto,
+                    })
+                    seen['e'].add(key)
+                continue
+
+    resumen['total_items'] = sum(len(items) for items in sugeridos.values())
+    return sugeridos, resumen
+
+
+def _autocompletar_rendicion_desde_entregas(rendicion):
+    """
+    Regenera idempotentemente lineas A/C/E/D desde los pagos registrados por entrega en la ruta.
+    Reglas de mapeo:
+    - A: pago con metodo=cheque
+    - C: pago con metodo=credito
+    - E: pago con metodo=transferencia
+    - D: entrega con estado in {fallido, devuelto}
+    
+    Notas de idempotencia:
+    - No borra items existentes (permite preservar ediciones manuales)
+    - Solo crea items nuevos si no existen (validacion por numero_factura, cliente, monto)
+    - Puede llamarse multiples veces sin crear duplicados
+    """
+    sugeridos, _ = _build_autocompletado_desde_ruta(rendicion.ruta)
+
+    def _existe_credito_documento(numero_factura, nombre_cliente, monto):
+        return rendicion.creditos_documentos.filter(
+            numero_factura=numero_factura,
+            nombre_cliente=nombre_cliente,
+            monto=monto,
+        ).exists()
+
+    def _existe_credito_confianza(numero_factura, autoriza_credito, monto):
+        return rendicion.creditos_confianza.filter(
+            numero_factura=numero_factura,
+            autoriza_credito=autoriza_credito,
+            monto=monto,
+        ).exists()
+
+    def _existe_deposito_transferencia(numero_factura, monto):
+        return rendicion.depositos_transferencias.filter(
+            numero_factura=numero_factura,
+            monto=monto,
+        ).exists()
+
+    def _existe_factura_nula(numero_factura):
+        return rendicion.facturas_nulas_detalle.filter(numero_factura=numero_factura).exists()
+
+    for item in sugeridos['a']:
+        if not _existe_credito_documento(item['numero_factura'], item['nombre_cliente'], item['monto']):
+            rendicion.creditos_documentos.create(**item)
+
+    for item in sugeridos['c']:
+        if not _existe_credito_confianza(item['numero_factura'], item['autoriza_credito'], item['monto']):
+            rendicion.creditos_confianza.create(**item)
+
+    for item in sugeridos['d']:
+        if not _existe_factura_nula(item['numero_factura']):
+            rendicion.facturas_nulas_detalle.create(**item)
+
+    for item in sugeridos['e']:
+        if not _existe_deposito_transferencia(item['numero_factura'], item['monto']):
+            rendicion.depositos_transferencias.create(**item)
+
+
 def _write_rendiciones_log(filename, payload):
     base_dir = Path(__file__).resolve().parents[1]
     candidates = [
@@ -265,6 +412,7 @@ def rendicion_create(request):
             return redirect('rendiciones:update', pk=ruta.rendicion.pk)
         initial = _initial_from_ruta(ruta)
 
+    autocompletado_info = None
     if request.method == 'POST':
         form = RendicionRepartoForm(request.POST)
         clientes_ruta_sugeridos = get_clientes_ruta_nombres(ruta) if ruta else []
@@ -287,6 +435,7 @@ def rendicion_create(request):
             for fs in formsets.values():
                 fs.instance = rendicion
                 fs.save()
+            _autocompletar_rendicion_desde_entregas(rendicion)
             rendicion.recalcular_totales()
             rendicion.save(update_fields=['menos_items', 'total_dinero_recibir'])
             messages.success(request, 'Rendición creada correctamente.')
@@ -294,12 +443,19 @@ def rendicion_create(request):
     else:
         form = RendicionRepartoForm(initial=initial)
         clientes_ruta_sugeridos = get_clientes_ruta_nombres(ruta) if ruta else []
-        formsets = build_formsets(instance=None, ruta=ruta, clientes_sugeridos=clientes_ruta_sugeridos)
+        initial_formsets, autocompletado_info = _build_autocompletado_desde_ruta(ruta)
+        formsets = build_formsets(
+            instance=None,
+            ruta=ruta,
+            clientes_sugeridos=clientes_ruta_sugeridos,
+            initial_data=initial_formsets,
+        )
 
     ctx = {
         'titulo': 'Nueva rendición de reparto',
         'form': form,
         'clientes_ruta_sugeridos': clientes_ruta_sugeridos,
+        'autocompletado_info': autocompletado_info,
         **formsets,
     }
     return render(request, 'rendiciones/form.html', ctx)
@@ -318,6 +474,8 @@ def rendicion_update(request, pk):
             rendicion = form.save()
             for fs in formsets.values():
                 fs.save()
+            # Regenerar lineas de autocomplecion desde entregas (idempotente: no crea duplicados)
+            _autocompletar_rendicion_desde_entregas(rendicion)
             rendicion.recalcular_totales()
             rendicion.save(update_fields=['menos_items', 'total_dinero_recibir'])
             messages.success(request, 'Rendición actualizada correctamente.')

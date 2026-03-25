@@ -1,0 +1,431 @@
+{% extends 'base.html' %}
+{% block title %}{{ plan.nombre }} - Planificacion Semanal{% endblock %}
+{% block active_planner %}active{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+  #plannerMap {
+    height: 470px;
+    border-radius: 0.35rem;
+  }
+  .planner-legend {
+    background: #fff;
+    border-radius: 8px;
+    padding: 8px 10px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    line-height: 1.5;
+    font-size: 0.85rem;
+  }
+  .planner-dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-right: 6px;
+  }
+</style>
+{% endblock %}
+
+{% block page_heading %}
+<div class="d-sm-flex align-items-center justify-content-between mb-4">
+  <h1 class="h3 mb-0 text-gray-800"><i class="fas fa-calendar-week mr-2 text-primary"></i>{{ plan.nombre }}</h1>
+  <div>
+    <a href="{% url 'planner:update' plan.pk %}" class="btn btn-warning btn-sm"><i class="fas fa-edit mr-1"></i> Editar plan</a>
+    <a href="{% url 'planner:list' %}" class="btn btn-secondary btn-sm"><i class="fas fa-arrow-left mr-1"></i> Volver</a>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+{{ map_points|json_script:"planner-map-data" }}
+
+<div class="card shadow mb-4">
+  <div class="card-body">
+    <div class="d-flex flex-wrap align-items-center justify-content-between">
+      <div>
+        <p class="mb-1"><strong>Alcance:</strong> Todos los clientes creados en el modulo Clientes</p>
+        <p class="mb-0 text-muted small">Puedes regenerar sugerencias en cualquier momento. Los clientes bloqueados se respetan.</p>
+        <p class="mb-0 text-muted small">
+          Limites: {{ plan.max_horas_jornada }} h jornada | {{ plan.velocidad_promedio_kmh }} km/h | {{ plan.minutos_servicio_por_cliente }} min/cliente
+        </p>
+      </div>
+      <form method="post" class="mt-2 mt-md-0">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="generar">
+        <button type="submit" class="btn btn-primary"><i class="fas fa-magic mr-1"></i> Generar recomendaciones</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="card shadow mb-4 border-left-primary">
+  <div class="card-header py-3 d-flex justify-content-between align-items-center">
+    <h6 class="m-0 font-weight-bold text-primary">1) Seleccionar clientes con reparto</h6>
+    <span class="badge badge-primary">{{ clientes_seleccionados_ids|length }} seleccionados</span>
+  </div>
+  <div class="card-body">
+    <p class="small text-muted mb-2">
+      Este paso es obligatorio: primero selecciona los clientes que tendran reparto de productos y luego genera la planificacion semanal.
+    </p>
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="actualizar_clientes_reparto">
+      <div class="mb-2">
+        <button type="button" id="btnSelectAllClientes" class="btn btn-outline-secondary btn-sm mr-1">
+          <i class="fas fa-check-square mr-1"></i> Seleccionar todos
+        </button>
+        <button type="button" id="btnClearClientes" class="btn btn-outline-secondary btn-sm">
+          <i class="fas fa-square mr-1"></i> Limpiar seleccion
+        </button>
+      </div>
+      <select id="clientesRepartoSelect" name="clientes_reparto" class="form-control" multiple size="10">
+        {% for cliente in clientes_todos %}
+          <option value="{{ cliente.id }}" {% if cliente.id in clientes_seleccionados_ids %}selected{% endif %}>
+            {{ cliente.nombre }}{% if cliente.comuna %} - {{ cliente.comuna }}{% endif %} ({{ cliente.tiempo_estimado_atencion }} min)
+          </option>
+        {% endfor %}
+      </select>
+      <small class="text-muted">Tip: usa Ctrl/Cmd + clic para seleccionar multiples clientes.</small>
+      <div class="mt-2">
+        <button type="submit" class="btn btn-outline-primary btn-sm">
+          <i class="fas fa-save mr-1"></i> Guardar seleccion de reparto
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card shadow mb-4">
+  <div class="card-header py-3">
+    <h6 class="m-0 font-weight-bold text-primary">Ajuste manual de parametros</h6>
+  </div>
+  <div class="card-body">
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="actualizar_parametros">
+      <div class="form-row">
+        <div class="form-group col-md-2">
+          <label>Max horas</label>
+          <input type="number" step="0.1" min="1" name="max_horas_jornada" class="form-control form-control-sm" value="{{ plan.max_horas_jornada }}">
+        </div>
+        <div class="form-group col-md-2">
+          <label>Vel km/h</label>
+          <input type="number" step="0.1" min="1" name="velocidad_promedio_kmh" class="form-control form-control-sm" value="{{ plan.velocidad_promedio_kmh }}">
+        </div>
+        <div class="form-group col-md-2">
+          <label>Min/cliente</label>
+          <input type="number" min="1" name="minutos_servicio_por_cliente" class="form-control form-control-sm" value="{{ plan.minutos_servicio_por_cliente }}">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group col-md-2"><label>Cupo Lun</label><input type="number" min="0" name="capacidad_lunes" class="form-control form-control-sm" value="{{ plan.capacidad_lunes|default:'' }}"></div>
+        <div class="form-group col-md-2"><label>Cupo Mar</label><input type="number" min="0" name="capacidad_martes" class="form-control form-control-sm" value="{{ plan.capacidad_martes|default:'' }}"></div>
+        <div class="form-group col-md-2"><label>Cupo Mie</label><input type="number" min="0" name="capacidad_miercoles" class="form-control form-control-sm" value="{{ plan.capacidad_miercoles|default:'' }}"></div>
+        <div class="form-group col-md-2"><label>Cupo Jue</label><input type="number" min="0" name="capacidad_jueves" class="form-control form-control-sm" value="{{ plan.capacidad_jueves|default:'' }}"></div>
+        <div class="form-group col-md-2"><label>Cupo Vie</label><input type="number" min="0" name="capacidad_viernes" class="form-control form-control-sm" value="{{ plan.capacidad_viernes|default:'' }}"></div>
+      </div>
+      <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-sliders-h mr-1"></i> Guardar parametros y recalcular</button>
+    </form>
+  </div>
+</div>
+
+{% if no_asignados_detalle %}
+<div class="card shadow mb-4 border-left-danger">
+  <div class="card-header py-3 d-flex justify-content-between align-items-center">
+    <h6 class="m-0 font-weight-bold text-danger">Clientes no asignados por restricciones</h6>
+    <span class="badge badge-danger">{{ no_asignados_detalle|length }}</span>
+  </div>
+  <div class="card-body p-2">
+    <div class="table-responsive">
+      <table class="table table-sm table-bordered mb-0">
+        <thead class="thead-light">
+          <tr>
+            <th>Cliente</th>
+            <th>Comuna</th>
+            <th>Motivo</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for n in no_asignados_detalle %}
+          <tr>
+            <td>{{ n.nombre }}</td>
+            <td>{{ n.comuna }}</td>
+            <td class="small">{{ n.motivo }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% if comunas_divididas %}
+<div class="card shadow mb-4 border-left-warning">
+  <div class="card-header py-3 d-flex justify-content-between align-items-center">
+    <h6 class="m-0 font-weight-bold text-warning">Comunas divididas esta semana</h6>
+    <span class="badge badge-warning">{{ comunas_divididas|length }}</span>
+  </div>
+  <div class="card-body p-2">
+    <div class="table-responsive">
+      <table class="table table-sm table-bordered mb-0">
+        <thead class="thead-light">
+          <tr>
+            <th>Comuna</th>
+            <th>Total clientes</th>
+            <th>Distribucion por dia</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for c in comunas_divididas %}
+          <tr>
+            <td><strong>{{ c.comuna }}</strong></td>
+            <td>{{ c.total_clientes }}</td>
+            <td>
+              {% for d in c.dias_resumen %}
+                <span class="badge badge-light mr-1">{{ d.dia }}: {{ d.count }}</span>
+              {% endfor %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<div class="card shadow mb-4">
+  <div class="card-header py-3 d-flex align-items-center justify-content-between">
+    <h6 class="m-0 font-weight-bold text-primary">Mapa de recomendaciones semanales</h6>
+    <span class="text-muted small">
+      {{ map_points|length }} con coordenadas | {{ map_missing }} sin coordenadas
+    </span>
+  </div>
+  <div class="card-body p-0">
+    <div id="plannerMap"></div>
+  </div>
+  <div class="card-footer small text-muted">
+    El color de cada marcador representa el dia recomendado de atencion.
+  </div>
+</div>
+
+<div class="card shadow mb-4">
+  <div class="card-header py-3">
+    <h6 class="m-0 font-weight-bold text-primary">Agregar excepcion manual</h6>
+  </div>
+  <div class="card-body">
+    <form method="post" class="form-inline">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="agregar">
+      <select name="cliente_id" class="form-control form-control-sm mr-2" required>
+        <option value="">Selecciona cliente</option>
+        {% for cliente in clientes_disponibles %}
+          <option value="{{ cliente.pk }}">{{ cliente.nombre }} {% if cliente.comuna %}({{ cliente.comuna }}){% endif %}</option>
+        {% endfor %}
+      </select>
+      <select name="dia_semana" class="form-control form-control-sm mr-2" required>
+        {% for opt, label in day_options %}
+          <option value="{{ opt }}">{{ label }}</option>
+        {% endfor %}
+      </select>
+      <input type="number" name="orden" min="1" value="1" class="form-control form-control-sm mr-2" style="max-width:110px;">
+      <button type="submit" class="btn btn-success btn-sm"><i class="fas fa-plus mr-1"></i> Agregar</button>
+    </form>
+  </div>
+</div>
+
+<div class="row">
+  {% for section in day_sections %}
+  <div class="col-xl-6 mb-4">
+    <div class="card shadow h-100">
+      <div class="card-header py-3 d-flex justify-content-between align-items-center">
+        <h6 class="m-0 font-weight-bold text-primary">{{ section.label }}</h6>
+        <div>
+          <span class="badge badge-info mr-1">{{ section.total }} clientes</span>
+          {% if section.capacity %}
+            <span class="badge badge-warning">Cupo {{ section.capacity }}</span>
+          {% else %}
+            <span class="badge badge-secondary">Sin limite</span>
+          {% endif %}
+          <span class="badge badge-light">{{ section.resumen.km }} km</span>
+          <span class="badge badge-light">{{ section.resumen.horas }} h</span>
+          {% if section.resumen.cumple %}
+            <span class="badge badge-success">Dentro de limite</span>
+          {% else %}
+            <span class="badge badge-danger">Excede limite</span>
+          {% endif %}
+        </div>
+      </div>
+      <div class="card-body p-2">
+        <div class="table-responsive">
+          <table class="table table-sm table-bordered mb-0">
+            <thead class="thead-light">
+              <tr>
+                <th>#</th>
+                <th>Cliente</th>
+                <th>Comuna</th>
+                <th>Manual</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for rec in section.items %}
+              <tr>
+                <td style="width:70px;">
+                  <form method="post" class="form-inline">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="actualizar">
+                    <input type="hidden" name="recomendacion_id" value="{{ rec.pk }}">
+                    <input type="number" class="form-control form-control-sm" name="orden" min="1" value="{{ rec.orden }}" style="width:64px;">
+                </td>
+                <td>
+                  <strong>{{ rec.cliente.nombre }}</strong>
+                  {% if rec.observacion %}
+                    <div class="small text-muted">{{ rec.observacion }}</div>
+                  {% endif %}
+                </td>
+                <td>{{ rec.cliente.comuna|default:'-' }}</td>
+                <td>
+                  <select name="dia_semana" class="form-control form-control-sm mb-1">
+                    {% for opt, label in day_options %}
+                      <option value="{{ opt }}" {% if rec.dia_semana == opt %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                  </select>
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="bloqueado" id="bloq{{ rec.pk }}" {% if rec.bloqueado %}checked{% endif %}>
+                    <label class="form-check-label small" for="bloq{{ rec.pk }}">Bloquear</label>
+                  </div>
+                </td>
+                <td style="white-space:nowrap;">
+                  <input type="text" class="form-control form-control-sm mb-1" name="observacion" value="{{ rec.observacion }}" placeholder="Nota">
+                  <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-save"></i></button>
+                  </form>
+                  <form method="post" class="d-inline">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="eliminar">
+                    <input type="hidden" name="recomendacion_id" value="{{ rec.pk }}">
+                    <button type="submit" class="btn btn-danger btn-sm"><i class="fas fa-trash"></i></button>
+                  </form>
+                </td>
+              </tr>
+              {% empty %}
+              <tr><td colspan="5" class="text-center text-muted">Sin recomendaciones para este dia.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+(function () {
+  var mapContainer = document.getElementById('plannerMap');
+  var dataNode = document.getElementById('planner-map-data');
+  if (!mapContainer || !dataNode) {
+    return;
+  }
+
+  var points = [];
+  try {
+    points = JSON.parse(dataNode.textContent || '[]');
+  } catch (e) {
+    console.error('No fue posible leer datos del mapa de planificacion.', e);
+    return;
+  }
+
+  var dayColors = {
+    lun: '#1d4ed8',
+    mar: '#0f766e',
+    mie: '#ca8a04',
+    jue: '#b91c1c',
+    vie: '#7c3aed'
+  };
+
+  var dayLabels = {
+    lun: 'Lunes',
+    mar: 'Martes',
+    mie: 'Miercoles',
+    jue: 'Jueves',
+    vie: 'Viernes'
+  };
+
+  var map = L.map('plannerMap').setView([-35.6751, -71.5429], 5);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap',
+    maxZoom: 19
+  }).addTo(map);
+
+  var bounds = [];
+  points.forEach(function (p) {
+    var color = dayColors[p.dia] || '#374151';
+    var marker = L.circleMarker([p.lat, p.lon], {
+      radius: 8,
+      color: color,
+      weight: 2,
+      fillColor: color,
+      fillOpacity: 0.65
+    });
+
+    var popup = ''
+      + '<div style="min-width:220px">'
+      + '<strong>' + (p.nombre || '-') + '</strong><br>'
+      + '<span><b>Dia:</b> ' + (p.dia_label || dayLabels[p.dia] || p.dia) + '</span><br>'
+      + '<span><b>Orden:</b> ' + p.orden + '</span><br>'
+      + '<span><b>Comuna:</b> ' + (p.comuna || '-') + '</span><br>'
+      + '<span><b>Direccion:</b> ' + (p.direccion || '-') + '</span><br>'
+      + (p.bloqueado ? '<span class="badge badge-warning mt-1">Bloqueado manualmente</span><br>' : '')
+      + '<div class="mt-2">'
+      + '<a href="/clientes/' + p.id + '/" class="btn btn-info btn-sm mr-1"><i class="fas fa-eye"></i> Ver</a>'
+      + '<a href="https://waze.com/ul?ll=' + p.lat + ',' + p.lon + '&navigate=yes" target="_blank" class="btn btn-primary btn-sm"><i class="fab fa-waze"></i> Waze</a>'
+      + '</div>'
+      + '</div>';
+
+    marker.bindPopup(popup);
+    marker.addTo(map);
+    bounds.push([p.lat, p.lon]);
+  });
+
+  if (bounds.length > 0) {
+    map.fitBounds(bounds, { padding: [20, 20] });
+  }
+
+  var legend = L.control({ position: 'bottomright' });
+  legend.onAdd = function () {
+    var div = L.DomUtil.create('div', 'planner-legend');
+    var keys = ['lun', 'mar', 'mie', 'jue', 'vie'];
+    div.innerHTML = '<strong>Dias</strong><br>';
+    keys.forEach(function (k) {
+      div.innerHTML += '<span class="planner-dot" style="background:' + dayColors[k] + '"></span>' + dayLabels[k] + '<br>';
+    });
+    return div;
+  };
+  legend.addTo(map);
+
+  var selectClientes = document.getElementById('clientesRepartoSelect');
+  var btnSelectAll = document.getElementById('btnSelectAllClientes');
+  var btnClear = document.getElementById('btnClearClientes');
+
+  if (selectClientes && btnSelectAll && btnClear) {
+    btnSelectAll.addEventListener('click', function () {
+      Array.prototype.forEach.call(selectClientes.options, function (option) {
+        option.selected = true;
+      });
+    });
+
+    btnClear.addEventListener('click', function () {
+      Array.prototype.forEach.call(selectClientes.options, function (option) {
+        option.selected = false;
+      });
+    });
+  }
+})();
+</script>
+{% endblock %}

@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import RutaDia, ParadaRuta, Entrega
+from .models import RutaDia, ParadaRuta, Entrega, EntregaPago
 
 
 class ParadaRutaInline(admin.TabularInline):
@@ -18,8 +18,15 @@ class RutaDiaAdmin(admin.ModelAdmin):
 
 @admin.register(Entrega)
 class EntregaAdmin(admin.ModelAdmin):
-    list_display = ('cliente', 'empresa', 'estado', 'fecha_programada', 'conductor')
-    list_filter = ('estado', 'fecha_programada', 'empresa')
+    list_display = ('cliente', 'empresa', 'estado', 'estado_pago', 'fecha_programada', 'conductor')
+    list_filter = ('estado', 'estado_pago', 'fecha_programada', 'empresa')
     search_fields = ('cliente__nombre', 'empresa__nombre')
     date_hierarchy = 'fecha_programada'
     raw_id_fields = ('cliente', 'empresa', 'conductor')
+
+
+@admin.register(EntregaPago)
+class EntregaPagoAdmin(admin.ModelAdmin):
+    list_display = ('entrega', 'metodo', 'monto', 'tiene_documento_credito', 'registrado_por', 'fecha_registro')
+    list_filter = ('metodo', 'tiene_documento_credito', 'fecha_registro')
+    search_fields = ('entrega__cliente__nombre', 'observacion')

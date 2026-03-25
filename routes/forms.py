@@ -1,5 +1,7 @@
 from django import forms
-from .models import RutaDia, ParadaRuta, Entrega
+from django.forms import inlineformset_factory
+
+from .models import RutaDia, ParadaRuta, Entrega, EntregaPago
 from accounts.models import CustomUser
 
 
@@ -63,7 +65,7 @@ class EntregaForm(forms.ModelForm):
 class EntregaEstadoForm(forms.ModelForm):
     class Meta:
         model = Entrega
-        fields = ['estado', 'observacion', 'foto_evidencia', 'fecha_entrega']
+        fields = ['estado', 'estado_pago', 'observacion', 'foto_evidencia', 'fecha_entrega']
         widgets = {
             'fecha_entrega': forms.DateTimeInput(attrs={'type': 'datetime-local'}),
             'observacion': forms.Textarea(attrs={'rows': 2}),
@@ -73,3 +75,42 @@ class EntregaEstadoForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         for field in self.fields.values():
             field.widget.attrs.update({'class': 'form-control'})
+
+        self.fields['estado_pago'].choices = [
+            choice for choice in self.fields['estado_pago'].choices if choice[0] != 'credito'
+        ]
+
+        if self.instance and self.instance.pk and self.instance.estado_pago == 'credito':
+            self.initial['estado_pago'] = 'pendiente'
+
+
+class EntregaPagoForm(forms.ModelForm):
+    class Meta:
+        model = EntregaPago
+        fields = ['metodo', 'monto', 'observacion']
+        widgets = {
+            'monto': forms.NumberInput(attrs={'min': 0, 'step': 1, 'inputmode': 'numeric'}),
+            'observacion': forms.TextInput(attrs={'placeholder': 'Referencia o detalle del pago'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for name, field in self.fields.items():
+            if isinstance(field.widget, forms.CheckboxInput):
+                field.widget.attrs.update({'class': 'form-check-input'})
+            else:
+                field.widget.attrs.update({'class': 'form-control form-control-sm'})
+
+
+EntregaPagoFormSet = inlineformset_factory(
+    Entrega,
+    EntregaPago,
+    form=EntregaPagoForm,
+    extra=0,
+    can_delete=False,
+)
+
+
+def build_entrega_pago_formset(data=None, instance=None):
+    formset = EntregaPagoFormSet(data=data, instance=instance, prefix='pagos')
+    return formset

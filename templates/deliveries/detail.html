@@ -38,8 +38,43 @@
               {{ entrega.get_estado_display }}
             </span>
           </dd>
+          <dt class="col-sm-5">Estado de pago:</dt>
+          <dd class="col-sm-7">
+            <span class="badge badge-{% if entrega.estado_pago == 'pagado_completo' %}success{% elif entrega.estado_pago == 'pagado_parcial' %}warning{% elif entrega.estado_pago == 'credito' %}info{% elif entrega.estado_pago == 'sin_pago' %}danger{% else %}secondary{% endif %}">
+              {{ entrega.get_estado_pago_display }}
+            </span>
+          </dd>
+          <dt class="col-sm-5">Total pagado:</dt>
+          <dd class="col-sm-7">${{ entrega.total_pagado|default:0 }}</dd>
           <dt class="col-sm-5">Observación:</dt><dd class="col-sm-7">{{ entrega.observacion|default:"–" }}</dd>
         </dl>
+      </div>
+    </div>
+
+    <div class="card shadow mb-4">
+      <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">Detalle de pagos</h6>
+      </div>
+      <div class="card-body">
+        {% if entrega.pagos.exists %}
+          <div class="list-group">
+            {% for pago in entrega.pagos.all %}
+              <div class="list-group-item">
+                <div class="d-flex justify-content-between align-items-center">
+                  <strong>{{ pago.get_metodo_display }}</strong>
+                  <span>${{ pago.monto }}</span>
+                </div>
+                {% if pago.metodo == 'credito' %}
+                <small class="text-muted d-block">Con documento: {% if pago.tiene_documento_credito %}Si{% else %}No{% endif %}</small>
+                {% endif %}
+                {% if pago.observacion %}<small class="text-muted d-block">{{ pago.observacion }}</small>{% endif %}
+                <small class="text-muted d-block">Registrado: {{ pago.fecha_registro|date:"d-m-Y H:i" }}</small>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="text-muted mb-0">Sin pagos registrados en esta entrega.</p>
+        {% endif %}
       </div>
     </div>
   </div>

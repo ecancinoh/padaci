@@ -56,6 +56,7 @@ for route, module, namespace in [
     ("empresas/", "companies.urls", "companies"),
     ("historial/", "history.urls", "history"),
     ("mapa/", "maps.urls", "maps"),
+    ("planificacion/", "planner.urls", "planner"),
     ("rutas/", "routes.urls", "routes"),
     ("rendiciones/", "rendiciones.urls", "rendiciones"),
 ]:

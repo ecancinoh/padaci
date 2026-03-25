@@ -58,6 +58,21 @@
             </div>
           </div>
 
+          <div class="form-group">
+            <button type="button" id="btn-current-location" class="btn btn-outline-primary btn-sm">
+              <i class="fas fa-location-arrow mr-1"></i> Usar ubicacion actual
+            </button>
+            <small id="geo-status" class="form-text text-muted mt-2"></small>
+          </div>
+
+          <div class="form-group">
+            <label for="{{ form.tiempo_estimado_atencion.id_for_label }}" class="font-weight-bold">
+              <i class="fas fa-stopwatch mr-1 text-primary"></i> Tiempo estimado de atencion (min)
+            </label>
+            {{ form.tiempo_estimado_atencion }}
+            {% if form.tiempo_estimado_atencion.errors %}<div class="text-danger small mt-1">{{ form.tiempo_estimado_atencion.errors }}</div>{% endif %}
+          </div>
+
           <!-- URLs generadas automáticamente -->
           <div id="url-preview-section" class="d-none">
             <hr>
@@ -127,6 +142,8 @@
 (function () {
   var latInput  = document.getElementById('{{ form.latitud.id_for_label }}');
   var lonInput  = document.getElementById('{{ form.longitud.id_for_label }}');
+  var geoBtn    = document.getElementById('btn-current-location');
+  var geoStatus = document.getElementById('geo-status');
   var section   = document.getElementById('url-preview-section');
   var gmapsInput = document.getElementById('url_gmaps_preview');
   var wazeInput  = document.getElementById('url_waze_preview');
@@ -151,6 +168,66 @@
 
   latInput.addEventListener('input', updateUrls);
   lonInput.addEventListener('input', updateUrls);
+
+  function setGeoStatus(message, isError) {
+    geoStatus.textContent = message || '';
+    geoStatus.classList.toggle('text-danger', !!isError);
+    geoStatus.classList.toggle('text-muted', !isError);
+  }
+
+  function setLoading(loading) {
+    if (!geoBtn) {
+      return;
+    }
+    geoBtn.disabled = loading;
+    geoBtn.innerHTML = loading
+      ? '<i class="fas fa-spinner fa-spin mr-1"></i> Obteniendo ubicacion...'
+      : '<i class="fas fa-location-arrow mr-1"></i> Usar ubicacion actual';
+  }
+
+  function handleGeoSuccess(position) {
+    var lat = Number(position.coords.latitude);
+    var lon = Number(position.coords.longitude);
+    latInput.value = lat.toFixed(6);
+    lonInput.value = lon.toFixed(6);
+    setGeoStatus('Ubicacion capturada correctamente.', false);
+    updateUrls();
+    setLoading(false);
+  }
+
+  function handleGeoError(error) {
+    var message = 'No se pudo obtener la ubicacion actual.';
+    if (error && error.code === 1) {
+      message = 'Permiso de ubicacion denegado. Habilitalo en el navegador.';
+    } else if (error && error.code === 2) {
+      message = 'No se pudo determinar la ubicacion (senal insuficiente).';
+    } else if (error && error.code === 3) {
+      message = 'Tiempo de espera agotado al obtener la ubicacion.';
+    }
+    setGeoStatus(message, true);
+    setLoading(false);
+  }
+
+  if (geoBtn) {
+    geoBtn.addEventListener('click', function () {
+      if (!navigator.geolocation) {
+        setGeoStatus('Tu navegador no soporta geolocalizacion.', true);
+        return;
+      }
+
+      setGeoStatus('Solicitando ubicacion actual...', false);
+      setLoading(true);
+      navigator.geolocation.getCurrentPosition(
+        handleGeoSuccess,
+        handleGeoError,
+        {
+          enableHighAccuracy: true,
+          timeout: 15000,
+          maximumAge: 0
+        }
+      );
+    });
+  }
 
   // Si ya hay valores al cargar (edición)
   updateUrls();

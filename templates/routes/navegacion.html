@@ -128,6 +128,7 @@
 var CSRF     = '{{ csrf_token }}';
 var URL_REOPT  = '{% url "routes:reoptimizar_posicion" ruta.pk %}';
 var URL_ESTADO = '{% url "routes:actualizar_parada" ruta.pk %}';
+var URL_ENTREGA_ESTADO_BASE = '{% url "routes:entregas_update_estado" 0 %}';
 
 var miLat = null, miLon = null;
 var miMarker = null;
@@ -317,6 +318,13 @@ function renderizarListaParadas(paradas) {
 
 // ── CAMBIAR ESTADO ────────────────────────────────────────────────────────────
 function cambiarEstado(entregaId, nuevoEstado) {
+  if (nuevoEstado === 'entregado') {
+    var baseUrl = URL_ENTREGA_ESTADO_BASE.replace('/0/', '/' + entregaId + '/');
+    var nextUrl = window.location.pathname + window.location.search;
+    window.location.href = baseUrl + '?next=' + encodeURIComponent(nextUrl);
+    return;
+  }
+
   fetch(URL_ESTADO, {
     method: 'POST',
     headers: {'Content-Type': 'application/json', 'X-CSRFToken': CSRF},

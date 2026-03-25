@@ -1,0 +1,64 @@
+{% extends 'base.html' %}
+{% block title %}Planificacion Semanal - PADACI{% endblock %}
+{% block active_planner %}active{% endblock %}
+
+{% block page_heading %}
+<div class="d-sm-flex align-items-center justify-content-between mb-4">
+  <h1 class="h3 mb-0 text-gray-800"><i class="fas fa-calendar-week mr-2 text-primary"></i>Planificacion Semanal</h1>
+  <a href="{% url 'planner:create' %}" class="btn btn-primary btn-sm shadow-sm">
+    <i class="fas fa-plus mr-1"></i> Nuevo plan
+  </a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="card shadow mb-4">
+  <div class="card-header py-3">
+    <form method="get" class="form-inline">
+      <input type="text" name="q" value="{{ request.GET.q }}" class="form-control form-control-sm mr-2" placeholder="Buscar plan...">
+      <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-search"></i></button>
+    </form>
+  </div>
+  <div class="card-body">
+    <div class="table-responsive">
+      <table class="table table-bordered table-hover table-sm">
+        <thead class="thead-light">
+          <tr>
+            <th>Plan</th>
+            <th>Empresa</th>
+            <th>Clientes recomendados</th>
+            <th>Activo</th>
+            <th>Actualizado</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for plan in planes %}
+          <tr>
+            <td><strong>{{ plan.nombre }}</strong></td>
+            <td>{{ plan.empresa.nombre|default:'Todas' }}</td>
+            <td><span class="badge badge-info">{{ plan.total_clientes }}</span></td>
+            <td>
+              {% if plan.activo %}
+                <span class="badge badge-success">Si</span>
+              {% else %}
+                <span class="badge badge-secondary">No</span>
+              {% endif %}
+            </td>
+            <td>{{ plan.fecha_actualizacion|date:'d-m-Y H:i' }}</td>
+            <td>
+              <a href="{% url 'planner:detail' plan.pk %}" class="btn btn-info btn-sm" title="Ver"><i class="fas fa-eye"></i></a>
+              <a href="{% url 'planner:update' plan.pk %}" class="btn btn-warning btn-sm" title="Editar"><i class="fas fa-edit"></i></a>
+              <a href="{% url 'planner:delete' plan.pk %}" class="btn btn-danger btn-sm" title="Eliminar"><i class="fas fa-trash"></i></a>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="6" class="text-center text-muted">No hay planes creados.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% include 'partials/pagination.html' with page_obj=page_obj %}
+  </div>
+</div>
+{% endblock %}

@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load l10n %}
 {% block title %}{{ cliente }} – PADACI{% endblock %}
 {% block active_clients %}active{% endblock %}
 
@@ -31,6 +32,9 @@
 
           <dt class="col-sm-5">Longitud:</dt>
           <dd class="col-sm-7">{{ cliente.longitud|default:"–" }}</dd>
+
+          <dt class="col-sm-5">Tiempo atención:</dt>
+          <dd class="col-sm-7">{{ cliente.tiempo_estimado_atencion }} min</dd>
         </dl>
       </div>
     </div>
@@ -101,10 +105,30 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-var map = L.map('minimap').setView([{{ cliente.latitud }}, {{ cliente.longitud }}], 15);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {attribution:'© OpenStreetMap'}).addTo(map);
-var marker = L.marker([{{ cliente.latitud }}, {{ cliente.longitud }}]).addTo(map);
-marker.bindPopup('<b>{{ cliente.nombre }}</b><br>{{ cliente.comuna }}{% if cliente.observaciones %}<br><span style="font-size:.82rem;"><i class="fas fa-sticky-note"></i> {{ cliente.observaciones|escapejs }}</span>{% endif %}').openPopup();
+document.addEventListener('DOMContentLoaded', function () {
+  var lat = parseFloat('{{ cliente.latitud|unlocalize }}');
+  var lon = parseFloat('{{ cliente.longitud|unlocalize }}');
+
+  if (!isFinite(lat) || !isFinite(lon) || typeof L === 'undefined') {
+    return;
+  }
+
+  var map = L.map('minimap').setView([lat, lon], 15);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap'
+  }).addTo(map);
+
+  var marker = L.marker([lat, lon]).addTo(map);
+  var popupContent = '<b>{{ cliente.nombre|escapejs }}</b>'
+    + '<br>{{ cliente.comuna|default:""|escapejs }}'
+    + '{% if cliente.observaciones %}<br><span style="font-size:.82rem;"><i class="fas fa-sticky-note"></i> {{ cliente.observaciones|escapejs }}</span>{% endif %}';
+  marker.bindPopup(popupContent).openPopup();
+
+  // Evita tiles incompletos cuando el mapa se monta dentro de un layout con cards.
+  setTimeout(function () {
+    map.invalidateSize();
+  }, 150);
+});
 </script>
 {% endif %}
 {% endblock %}

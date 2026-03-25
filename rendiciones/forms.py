@@ -14,19 +14,19 @@ from .models import (
 
 
 CHILE_BANK_CHOICES = [
-    ('Banco de Chile', 'Banco de Chile'),
-    ('BancoEstado', 'BancoEstado'),
-    ('Banco Santander Chile', 'Banco Santander Chile'),
-    ('Banco de Crédito e Inversiones (BCI)', 'Banco de Crédito e Inversiones (BCI)'),
-    ('Scotiabank Chile', 'Scotiabank Chile'),
-    ('Itaú Corpbanca', 'Itaú Corpbanca'),
-    ('Banco Security', 'Banco Security'),
-    ('Banco BICE', 'Banco BICE'),
-    ('Banco Falabella', 'Banco Falabella'),
-    ('Banco Ripley', 'Banco Ripley'),
-    ('Banco Consorcio', 'Banco Consorcio'),
-    ('Banco Internacional', 'Banco Internacional'),
-    ('Banco BTG Pactual Chile', 'Banco BTG Pactual Chile'),
+    ('Chile', 'Chile'),
+    ('Estado', 'Estado'),
+    ('Santander', 'Santander'),
+    ('BCI', 'BCI'),
+    ('Scotiabank', 'Scotiabank'),
+    ('Itaú', 'Itaú'),
+    ('Security', 'Security'),
+    ('BICE', 'BICE'),
+    ('Falabella', 'Falabella'),
+    ('Ripley', 'Ripley'),
+    ('Consorcio', 'Consorcio'),
+    ('Internacional', 'Internacional'),
+    ('BTG', 'BTG'),
 ]
 
 
@@ -180,10 +180,9 @@ class RendicionRepartoForm(forms.ModelForm):
         if instance.ruta_id:
             instance.total_consolidado = instance.ruta.total_consolidado
 
-        total_km_raw = ''
-        if self.is_bound:
-            total_km_raw = (self.data.get(self.add_prefix('total_kilometros_recorridos')) or '').strip()
-        instance._preserve_total_km_manual = bool(total_km_raw)
+        # Solo conservar valor manual cuando el usuario edita explícitamente
+        # el campo de total km. Si no, se recalcula automáticamente.
+        instance._preserve_total_km_manual = 'total_kilometros_recorridos' in self.changed_data
 
         if commit:
             instance.save()
@@ -252,70 +251,91 @@ def _apply_formset_css(formset):
             field.widget.attrs.update({'class': 'form-control form-control-sm'})
 
 
-CreditoDocumentoFormSet = inlineformset_factory(
-    RendicionReparto,
-    CreditoDocumentoItem,
-    form=CreditoDocumentoItemForm,
-    extra=8,
-    can_delete=True,
-)
-
-DevolucionParcialFormSet = inlineformset_factory(
-    RendicionReparto,
-    DevolucionParcialItem,
-    form=DevolucionParcialItemForm,
-    extra=8,
-    can_delete=True,
-)
-
-CreditoConfianzaFormSet = inlineformset_factory(
-    RendicionReparto,
-    CreditoConfianzaItem,
-    form=CreditoConfianzaItemForm,
-    extra=8,
-    can_delete=True,
-)
-
-FacturaNulaFormSet = inlineformset_factory(
-    RendicionReparto,
-    FacturaNulaItem,
-    form=FacturaNulaItemForm,
-    extra=8,
-    can_delete=True,
-)
-
-DepositoTransferenciaFormSet = inlineformset_factory(
-    RendicionReparto,
-    DepositoTransferenciaItem,
-    form=DepositoTransferenciaItemForm,
-    extra=8,
-    can_delete=True,
-)
+def _make_inline_formset(model_class, form_class, extra_forms):
+    return inlineformset_factory(
+        RendicionReparto,
+        model_class,
+        form=form_class,
+        extra=extra_forms,
+        can_delete=True,
+    )
 
 
-def build_formsets(data=None, instance=None, ruta=None, clientes_sugeridos=None):
+def build_formsets(data=None, instance=None, ruta=None, clientes_sugeridos=None, initial_data=None):
     ruta_base = ruta
     if not ruta_base and instance and getattr(instance, 'ruta_id', None):
         ruta_base = instance.ruta
     cliente_choices = _cliente_choices_from_ruta(ruta_base)
     clientes_sugeridos = clientes_sugeridos or get_clientes_ruta_nombres(ruta_base)
+    initial_data = initial_data or {}
+
+    default_extra = 1
+
+    def extra_for(prefix):
+        if data is not None:
+            return default_extra
+        sugeridos = initial_data.get(prefix) or []
+        return max(default_extra, len(sugeridos) + 1)
+
+    credito_documento_formset = _make_inline_formset(
+        CreditoDocumentoItem,
+        CreditoDocumentoItemForm,
+        extra_for('a'),
+    )
+    devolucion_parcial_formset = _make_inline_formset(
+        DevolucionParcialItem,
+        DevolucionParcialItemForm,
+        extra_for('b'),
+    )
+    credito_confianza_formset = _make_inline_formset(
+        CreditoConfianzaItem,
+        CreditoConfianzaItemForm,
+        extra_for('c'),
+    )
+    factura_nula_formset = _make_inline_formset(
+        FacturaNulaItem,
+        FacturaNulaItemForm,
+        extra_for('d'),
+    )
+    deposito_transferencia_formset = _make_inline_formset(
+        DepositoTransferenciaItem,
+        DepositoTransferenciaItemForm,
+        extra_for('e'),
+    )
 
     formsets = {
-        'formset_a': CreditoDocumentoFormSet(
+        'formset_a': credito_documento_formset(
             data=data,
             instance=instance,
             prefix='a',
+            initial=initial_data.get('a'),
             form_kwargs={'cliente_choices': cliente_choices},
         ),
-        'formset_b': DevolucionParcialFormSet(data=data, instance=instance, prefix='b'),
-        'formset_c': CreditoConfianzaFormSet(
+        'formset_b': devolucion_parcial_formset(
+            data=data,
+            instance=instance,
+            prefix='b',
+            initial=initial_data.get('b'),
+        ),
+        'formset_c': credito_confianza_formset(
             data=data,
             instance=instance,
             prefix='c',
+            initial=initial_data.get('c'),
             form_kwargs={'clientes_sugeridos': clientes_sugeridos},
         ),
-        'formset_d': FacturaNulaFormSet(data=data, instance=instance, prefix='d'),
-        'formset_e': DepositoTransferenciaFormSet(data=data, instance=instance, prefix='e'),
+        'formset_d': factura_nula_formset(
+            data=data,
+            instance=instance,
+            prefix='d',
+            initial=initial_data.get('d'),
+        ),
+        'formset_e': deposito_transferencia_formset(
+            data=data,
+            instance=instance,
+            prefix='e',
+            initial=initial_data.get('e'),
+        ),
     }
     for formset in formsets.values():
         _apply_formset_css(formset)

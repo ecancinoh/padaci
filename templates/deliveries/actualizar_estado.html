@@ -8,11 +8,86 @@
   <h1 class="h3 mb-0 text-gray-800">
     <i class="fas fa-sync mr-2 text-success"></i>Actualizar Estado – {{ entrega.cliente }}
   </h1>
-  <a href="{% url 'routes:entregas_detail' entrega.pk %}" class="btn btn-secondary btn-sm"><i class="fas fa-arrow-left mr-1"></i> Volver</a>
+  <a href="{% if next_url %}{{ next_url }}{% else %}{% url 'routes:entregas_detail' entrega.pk %}{% endif %}" class="btn btn-secondary btn-sm"><i class="fas fa-arrow-left mr-1"></i> Volver</a>
 </div>
 {% endblock %}
 
 {% block content %}
+<style>
+  .mobile-save-bar {
+    position: sticky;
+    bottom: 0;
+    z-index: 30;
+    background: #fff;
+    border-top: 1px solid #e3e6f0;
+    padding: 10px;
+  }
+  .pago-card {
+    border: 1px solid #dfe3ef;
+    border-radius: 0.5rem;
+    padding: 0.75rem;
+    margin-bottom: 0.6rem;
+    background: #f8f9fc;
+  }
+  .pago-card.is-deleting {
+    opacity: 0.55;
+    pointer-events: none;
+  }
+  .pago-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+  }
+  .pago-card-title {
+    margin: 0;
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: #4e73df;
+  }
+  .pago-card-remove {
+    width: 40px;
+    height: 40px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+  }
+  .pago-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+  }
+  .pago-empty {
+    display: none;
+    border: 1px dashed #c8cfde;
+    border-radius: 0.5rem;
+    padding: 0.85rem;
+    color: #6c757d;
+    margin-bottom: 0.75rem;
+    background: #fff;
+  }
+  @media (max-width: 768px) {
+    .pago-card .form-group {
+      margin-bottom: 0.55rem;
+    }
+    .mobile-save-btn {
+      width: 100%;
+      min-height: 44px;
+      font-weight: 600;
+    }
+    .pago-toolbar {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    .pago-toolbar .btn {
+      width: 100%;
+    }
+  }
+</style>
 <div class="row">
   <div class="col-lg-5">
     <div class="card shadow mb-4">
@@ -20,10 +95,61 @@
       <div class="card-body">
         <form method="post" enctype="multipart/form-data">
           {% csrf_token %}
-          {{ form|crispy }}
-          <hr>
-          <button type="submit" class="btn btn-success"><i class="fas fa-check mr-1"></i> Guardar Estado</button>
-          <a href="{% url 'routes:entregas_detail' entrega.pk %}" class="btn btn-secondary ml-2">Cancelar</a>
+          {% if next_url %}
+          <input type="hidden" name="next" value="{{ next_url }}">
+          {% endif %}
+          <div class="mb-3">
+            {{ form.estado|as_crispy_field }}
+            {{ form.estado_pago|as_crispy_field }}
+            {{ form.fecha_entrega|as_crispy_field }}
+            {{ form.observacion|as_crispy_field }}
+            {{ form.foto_evidencia|as_crispy_field }}
+          </div>
+
+          <div class="border rounded p-2 mb-3">
+            <div class="pago-toolbar">
+              <h6 class="font-weight-bold text-primary mb-0">
+                <i class="fas fa-wallet mr-1"></i>Pagos de esta entrega
+              </h6>
+              <button type="button" class="btn btn-outline-primary btn-sm" id="agregar-pago-btn">
+                <i class="fas fa-plus mr-1"></i> Agregar pago
+              </button>
+            </div>
+            {{ pagos_formset.management_form }}
+            <div id="pago-empty-state" class="pago-empty">
+              No hay pagos cargados. Usa el boton <strong>Agregar pago</strong> para registrar uno.
+            </div>
+            <div id="pagos-formset" data-next-index="{{ pagos_formset.total_form_count }}">
+            {% for f in pagos_formset %}
+              <div class="pago-card" data-pago-form data-existing="{% if f.instance.pk %}1{% else %}0{% endif %}" {% if f.instance.pk %}data-payment-id="{{ f.instance.pk }}" data-delete-url="{% url 'routes:entregas_delete_pago' entrega.pk f.instance.pk %}"{% endif %}>
+                {% for hidden in f.hidden_fields %}{{ hidden }}{% endfor %}
+                <div class="pago-card-header">
+                  <p class="pago-card-title">Pago #{{ forloop.counter }}</p>
+                  <button type="button" class="btn btn-outline-danger btn-sm pago-card-remove" data-remove-pago aria-label="Eliminar pago">
+                    <i class="fas fa-trash"></i>
+                  </button>
+                </div>
+                <div class="row">
+                  <div class="col-12 col-md-5">{{ f.metodo|as_crispy_field }}</div>
+                  <div class="col-12 col-md-3">{{ f.monto|as_crispy_field }}</div>
+                </div>
+                <div class="row">
+                  <div class="col-12">{{ f.observacion|as_crispy_field }}</div>
+                </div>
+              </div>
+            {% endfor %}
+            </div>
+            <small class="text-muted d-block">
+              Puedes registrar pago mixto agregando varias lineas con distintos metodos y montos.
+            </small>
+          </div>
+
+          <div class="mobile-save-bar">
+            <button type="submit" class="btn btn-success mobile-save-btn">
+              <i class="fas fa-check mr-1"></i> Guardar estado y pagos
+            </button>
+            <a href="{% if next_url %}{{ next_url }}{% else %}{% url 'routes:entregas_detail' entrega.pk %}{% endif %}" class="btn btn-outline-secondary mobile-save-btn mt-2">Cancelar</a>
+          </div>
         </form>
       </div>
     </div>
@@ -51,4 +177,175 @@
     </div>
   </div>
 </div>
+
+<template id="pago-empty-form-template">
+  <div class="pago-card" data-pago-form data-existing="0">
+    {% for hidden in pagos_formset.empty_form.hidden_fields %}{{ hidden }}{% endfor %}
+    <div class="pago-card-header">
+      <p class="pago-card-title">Pago nuevo</p>
+      <button type="button" class="btn btn-outline-danger btn-sm pago-card-remove" data-remove-pago aria-label="Eliminar pago">
+        <i class="fas fa-trash"></i>
+      </button>
+    </div>
+    <div class="row">
+      <div class="col-12 col-md-5">{{ pagos_formset.empty_form.metodo|as_crispy_field }}</div>
+      <div class="col-12 col-md-3">{{ pagos_formset.empty_form.monto|as_crispy_field }}</div>
+    </div>
+    <div class="row">
+      <div class="col-12">{{ pagos_formset.empty_form.observacion|as_crispy_field }}</div>
+    </div>
+  </div>
+</template>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const pagosContainer = document.getElementById('pagos-formset');
+    const addPagoButton = document.getElementById('agregar-pago-btn');
+    const emptyState = document.getElementById('pago-empty-state');
+    const template = document.getElementById('pago-empty-form-template');
+    const totalFormsInput = document.getElementById('id_pagos-TOTAL_FORMS');
+    const initialFormsInput = document.getElementById('id_pagos-INITIAL_FORMS');
+    const maxFormsInput = document.getElementById('id_pagos-MAX_NUM_FORMS');
+    const csrfTokenInput = document.querySelector('input[name="csrfmiddlewaretoken"]');
+
+    function updateEmptyState() {
+      const forms = pagosContainer.querySelectorAll('[data-pago-form]');
+      emptyState.style.display = forms.length ? 'none' : 'block';
+    }
+
+    function updateManagementCounts() {
+      const forms = Array.from(pagosContainer.querySelectorAll('[data-pago-form]'));
+      const existingCount = forms.filter((form) => form.dataset.existing === '1').length;
+      totalFormsInput.value = String(forms.length);
+      initialFormsInput.value = String(existingCount);
+      if (maxFormsInput && maxFormsInput.value !== '') {
+        maxFormsInput.value = maxFormsInput.value;
+      }
+      pagosContainer.dataset.nextIndex = String(forms.length);
+    }
+
+    function replaceIndexAttributes(element, oldIndex, newIndex) {
+      const currentId = element.getAttribute('id');
+      const currentName = element.getAttribute('name');
+      const currentFor = element.getAttribute('for');
+
+      if (currentId) {
+        element.setAttribute('id', currentId.replace(oldIndex, newIndex));
+      }
+      if (currentName) {
+        element.setAttribute('name', currentName.replace(oldIndex, newIndex));
+      }
+      if (currentFor) {
+        element.setAttribute('for', currentFor.replace(oldIndex, newIndex));
+      }
+    }
+
+    function renumberForms() {
+      const forms = Array.from(pagosContainer.querySelectorAll('[data-pago-form]'));
+      forms.forEach((form, index) => {
+        const oldIndex = form.dataset.formIndex || '__prefix__';
+        const indexPattern = new RegExp(`pagos-(?:${oldIndex.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')}|__prefix__)`, 'g');
+
+        form.querySelectorAll('[id], [name], label[for]').forEach((element) => {
+          const elementId = element.getAttribute('id');
+          const elementName = element.getAttribute('name');
+          const elementFor = element.getAttribute('for');
+
+          if (elementId) {
+            element.setAttribute('id', elementId.replace(indexPattern, `pagos-${index}`));
+          }
+          if (elementName) {
+            element.setAttribute('name', elementName.replace(indexPattern, `pagos-${index}`));
+          }
+          if (elementFor) {
+            element.setAttribute('for', elementFor.replace(indexPattern, `pagos-${index}`));
+          }
+        });
+
+        form.dataset.formIndex = String(index);
+        const title = form.querySelector('.pago-card-title');
+        if (title) {
+          title.textContent = `Pago #${index + 1}`;
+        }
+      });
+      updateManagementCounts();
+      updateEmptyState();
+    }
+
+    function buildNewForm() {
+      const wrapper = document.createElement('div');
+      wrapper.innerHTML = template.innerHTML.trim();
+      const form = wrapper.firstElementChild;
+      form.dataset.formIndex = '__prefix__';
+      pagosContainer.appendChild(form);
+      renumberForms();
+      const firstField = form.querySelector('select, input, textarea');
+      if (firstField) {
+        firstField.focus();
+      }
+    }
+
+    async function deletePersistedForm(form) {
+      const deleteUrl = form.dataset.deleteUrl;
+      const csrfToken = csrfTokenInput ? csrfTokenInput.value : '';
+      if (!deleteUrl || !csrfToken) {
+        return;
+      }
+
+      form.classList.add('is-deleting');
+      try {
+        const response = await fetch(deleteUrl, {
+          method: 'POST',
+          headers: {
+            'X-CSRFToken': csrfToken,
+            'X-Requested-With': 'XMLHttpRequest',
+          },
+        });
+        const payload = await response.json();
+        if (!response.ok || !payload.ok) {
+          throw new Error(payload.error || 'No se pudo eliminar el pago.');
+        }
+        form.remove();
+        renumberForms();
+      } catch (error) {
+        form.classList.remove('is-deleting');
+        window.alert(error.message || 'No se pudo eliminar el pago.');
+      }
+    }
+
+    pagosContainer.addEventListener('click', function (event) {
+      const removeButton = event.target.closest('[data-remove-pago]');
+      if (!removeButton) {
+        return;
+      }
+
+      const form = removeButton.closest('[data-pago-form]');
+      if (!form) {
+        return;
+      }
+
+      if (form.dataset.existing === '1') {
+        deletePersistedForm(form);
+        return;
+      }
+
+      form.remove();
+      renumberForms();
+    });
+
+    addPagoButton.addEventListener('click', function () {
+      buildNewForm();
+    });
+
+    const renderedForms = pagosContainer.querySelectorAll('[data-pago-form]');
+    renderedForms.forEach((form, index) => {
+      form.dataset.formIndex = String(index);
+    });
+    renumberForms();
+
+    if (!renderedForms.length) {
+      buildNewForm();
+    }
+  });
+</script>
 {% endblock %}

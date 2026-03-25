@@ -200,6 +200,7 @@
                   <br><small class="text-muted"><i class="fas fa-building mr-1"></i>{{ p.entrega.empresa.nombre|default:"Sin empresa" }}</small>
                   <br><small class="text-muted"><i class="fas fa-user mr-1"></i>{{ p.entrega.conductor.get_full_name|default:"Sin conductor" }}</small>
                   <br><small class="text-muted"><i class="fas fa-calendar-alt mr-1"></i>Programada: {{ p.entrega.fecha_programada|date:"d-m-Y" }}</small>
+                  <br><small class="text-muted"><i class="fas fa-wallet mr-1"></i>Pagado: ${{ p.entrega.total_pagado|default:0 }}</small>
                   <br><small class="text-success {% if not p.entrega.fecha_entrega %}d-none{% endif %}" id="fecha-entrega-{{ p.entrega.pk }}"><i class="fas fa-check-circle mr-1"></i>Entregada: {% if p.entrega.fecha_entrega %}{{ p.entrega.fecha_entrega|date:"d-m-Y H:i" }}{% endif %}</small>
                   {% if p.entrega.descripcion %}<br><small class="text-muted"><i class="fas fa-box-open mr-1"></i>{{ p.entrega.descripcion }}</small>{% endif %}
                   {% if p.entrega.observacion %}<br><small class="text-info"><i class="fas fa-comment-dots mr-1"></i>{{ p.entrega.observacion }}</small>{% endif %}
@@ -207,17 +208,19 @@
                 </div>
                 <div class="text-right ml-2">
                   <span class="badge badge-{% if p.entrega.estado == 'entregado' %}success{% elif p.entrega.estado == 'fallido' %}danger{% elif p.entrega.estado == 'en_ruta' %}primary{% else %}warning{% endif %}" id="estado-badge-{{ p.entrega.pk }}">{{ p.entrega.get_estado_display }}</span>
-                  <br>
-                  <select class="form-control form-control-sm mt-1" style="min-width:150px;" onchange="actualizarEstadoParada({{ p.entrega.pk }}, this)">
-                    {% for value, label in p.entrega.ESTADO_CHOICES %}
-                      <option value="{{ value }}" {% if p.entrega.estado == value %}selected{% endif %}>{{ label }}</option>
-                    {% endfor %}
-                  </select>
+                  <br><span class="badge badge-{% if p.entrega.estado_pago == 'pagado_completo' %}success{% elif p.entrega.estado_pago == 'pagado_parcial' %}warning{% elif p.entrega.estado_pago == 'credito' %}info{% elif p.entrega.estado_pago == 'sin_pago' %}danger{% else %}secondary{% endif %} mt-1" id="estado-pago-badge-{{ p.entrega.pk }}">{{ p.entrega.get_estado_pago_display }}</span>
+                  <br><a href="{% url 'routes:entregas_update_estado' p.entrega.pk %}?next={{ request.get_full_path|urlencode }}" class="btn btn-primary btn-sm mt-1" style="min-width:150px;">
+                    <i class="fas fa-clipboard-check mr-1"></i>Registrar entrega
+                  </a>
                   {% if p.entrega.cliente.tiene_coordenadas %}
                   <br>
                   <a href="{{ p.entrega.cliente.url_waze }}" target="_blank" class="btn btn-info btn-sm mt-1" title="Waze"><i class="fas fa-route"></i></a>
                   <a href="{{ p.entrega.cliente.url_google_maps }}" target="_blank" class="btn btn-danger btn-sm mt-1" title="Google Maps"><i class="fas fa-map"></i></a>
                   {% endif %}
+                  <br>
+                  <button type="button" class="btn btn-outline-danger btn-sm mt-1" title="Eliminar cliente de la ruta" onclick="eliminarParada({{ p.entrega.pk }}, '{{ p.entrega.cliente.nombre|escapejs }}')">
+                    <i class="fas fa-trash-alt"></i>
+                  </button>
                 </div>
               </div>
             </div>
@@ -247,6 +250,8 @@ var URL_OPT          = '{% url "routes:optimizar" ruta.pk %}';
 var URL_SEARCH       = '{% url "routes:buscar_clientes" %}';
 var URL_TEXTO        = '{% url "routes:buscar_por_texto" ruta.pk %}';
 var URL_ACTUALIZAR_PARADA = '{% url "routes:actualizar_parada" ruta.pk %}';
+var URL_ELIMINAR_PARADA = '{% url "routes:eliminar_parada" ruta.pk %}';
+var URL_ENTREGA_ESTADO_BASE = '{% url "routes:entregas_update_estado" 0 %}';
 var URL_CREATE_CLIENT = '{% url "clients:create" %}';
 var ESTADOS_ENTREGA = [
   {value:'pendiente', label:'Pendiente'},
@@ -487,66 +492,75 @@ function estadoBadgeClass(estado) {
   return 'warning';
 }
 
-function estadoOptionsHtml(currentEstado) {
-  var html = '';
-  ESTADOS_ENTREGA.forEach(function(estado) {
-    html += '<option value="' + estado.value + '"' + (estado.value === currentEstado ? ' selected' : '') + '>' + estado.label + '</option>';
-  });
-  return html;
+function entregaRegistroUrl(entregaId) {
+  var baseUrl = URL_ENTREGA_ESTADO_BASE.replace('/0/', '/' + entregaId + '/');
+  var nextUrl = window.location.pathname + window.location.search;
+  return baseUrl + '?next=' + encodeURIComponent(nextUrl);
 }
 
-function actualizarEstadoParada(entregaId, selectEl) {
-  var nuevoEstado = selectEl.value;
-  selectEl.disabled = true;
-  fetch(URL_ACTUALIZAR_PARADA, {
+function estadoPagoBadgeClass(estadoPago) {
+  if (estadoPago === 'pagado_completo') return 'success';
+  if (estadoPago === 'pagado_parcial') return 'warning';
+  if (estadoPago === 'credito') return 'info';
+  if (estadoPago === 'sin_pago') return 'danger';
+  return 'secondary';
+}
+
+function eliminarParada(entregaId, clienteNombre) {
+  if (!confirm('¿Eliminar a ' + clienteNombre + ' de esta ruta?')) {
+    return;
+  }
+
+  fetch(URL_ELIMINAR_PARADA, {
     method: 'POST',
     headers: {'Content-Type':'application/json', 'X-CSRFToken': CSRF},
-    body: JSON.stringify({entrega_id: entregaId, estado: nuevoEstado})
+    body: JSON.stringify({entrega_id: entregaId})
   })
   .then(function(r){ return r.json(); })
   .then(function(data) {
-    selectEl.disabled = false;
     if (data.error) {
       showAlert('danger', data.error);
       return;
     }
-    var badge = document.getElementById('estado-badge-' + entregaId);
-    if (badge) {
-      badge.className = 'badge badge-' + estadoBadgeClass(data.estado);
-      badge.textContent = data.estado_display;
-    }
-    var fechaEntregaEl = document.getElementById('fecha-entrega-' + entregaId);
-    if (fechaEntregaEl) {
-      if (data.fecha_entrega) {
-        fechaEntregaEl.classList.remove('d-none');
-        fechaEntregaEl.innerHTML = '<i class="fas fa-check-circle mr-1"></i>Entregada: ' + escHtml(data.fecha_entrega);
-      } else {
-        fechaEntregaEl.classList.add('d-none');
-        fechaEntregaEl.innerHTML = '<i class="fas fa-check-circle mr-1"></i>Entregada:';
-      }
-    }
-    showAlert('success', 'Estado actualizado a <strong>' + escHtml(data.estado_display) + '</strong>.');
+
+    document.getElementById('totalParadasBadge').textContent = data.total_paradas;
+    document.getElementById('paradasTitle').textContent = 'Paradas (' + data.total_paradas + ')';
+    renderParadas(data.paradas || []);
+    dibujarRuta(data.paradas || []);
+    showAlert('success', 'Cliente removido de la ruta.');
   })
-  .catch(function(e) {
-    selectEl.disabled = false;
-    showAlert('danger', 'No se pudo actualizar el estado: ' + e.message);
+  .catch(function(e){
+    showAlert('danger', 'No se pudo eliminar la parada: ' + e.message);
   });
 }
 
 function renderParadas(paradas) {
+  if (!paradas || !paradas.length) {
+    document.getElementById('paradasContainer').innerHTML =
+      '<div class="text-center text-muted py-4" id="sinParadas">' +
+      '<i class="fas fa-route fa-3x mb-2 text-gray-300"></i>' +
+      '<p>Sin paradas aún.<br>Usa la IA para leer la hoja de ruta y generar las entregas.</p>' +
+      '</div>';
+    return;
+  }
+
   var html = '';
   paradas.forEach(function(p) {
     var wazeUrl  = (p.lat&&p.lon) ? 'https://waze.com/ul?ll='+p.lat+','+p.lon+'&navigate=yes' : '#';
     var gmapsUrl = (p.lat&&p.lon) ? 'https://maps.google.com/?q='+p.lat+','+p.lon : '#';
+    var clienteNombreAttr = String(p.cliente || '').replace(/'/g, "\\'");
     var nav = (p.lat&&p.lon)
       ? '<a href="'+wazeUrl+'"  target="_blank" class="btn btn-info  btn-sm mt-1" title="Waze"><i class="fas fa-route"></i></a>'+
         '<a href="'+gmapsUrl+'" target="_blank" class="btn btn-danger btn-sm mt-1" title="Google Maps"><i class="fas fa-map"></i></a>'
       : '';
     var estadoTxt = p.estado_display || 'Pendiente';
     var estadoCls = estadoBadgeClass(p.estado || 'pendiente');
+    var estadoPagoTxt = p.estado_pago_display || 'Pendiente';
+    var estadoPagoCls = estadoPagoBadgeClass(p.estado_pago || 'pendiente');
     var empresa = p.empresa ? escHtml(p.empresa) : 'Sin empresa';
     var conductor = p.conductor ? escHtml(p.conductor) : 'Sin conductor';
     var fechaProgramada = p.fecha_programada ? escHtml(p.fecha_programada) : '—';
+    var totalPagado = (typeof p.total_pagado === 'number') ? p.total_pagado : 0;
     var fechaEntrega = '<br><small class="text-success ' + (p.fecha_entrega ? '' : 'd-none') + '" id="fecha-entrega-' + p.entrega_id + '"><i class="fas fa-check-circle mr-1"></i>Entregada: ' + (p.fecha_entrega ? escHtml(p.fecha_entrega) : '') + '</small>';
     var descripcion = p.descripcion ? '<br><small class="text-muted"><i class="fas fa-box-open mr-1"></i>'+escHtml(p.descripcion)+'</small>' : '';
     var observacionEntrega = p.observacion_entrega ? '<br><small class="text-info"><i class="fas fa-comment-dots mr-1"></i>'+escHtml(p.observacion_entrega)+'</small>' : '';
@@ -558,15 +572,17 @@ function renderParadas(paradas) {
           '<br><small class="text-muted"><i class="fas fa-building mr-1"></i>'+empresa+'</small>'+
           '<br><small class="text-muted"><i class="fas fa-user mr-1"></i>'+conductor+'</small>'+
           '<br><small class="text-muted"><i class="fas fa-calendar-alt mr-1"></i>Programada: '+fechaProgramada+'</small>'+
+          '<br><small class="text-muted"><i class="fas fa-wallet mr-1"></i>Pagado: $'+escHtml(totalPagado)+'</small>'+
           fechaEntrega +
           descripcion +
           observacionEntrega +
           (p.observaciones ? '<br><small class="text-warning"><i class="fas fa-sticky-note mr-1"></i>'+escHtml(p.observaciones)+'</small>' : '')+
           '</div>'+
         '<div class="text-right ml-2"><span class="badge badge-'+estadoCls+'" id="estado-badge-'+p.entrega_id+'">'+escHtml(estadoTxt)+'</span>'+
-        '<br><select class="form-control form-control-sm mt-1" style="min-width:150px;" onchange="actualizarEstadoParada(' + p.entrega_id + ', this)">' +
-          estadoOptionsHtml(p.estado || 'pendiente') +
-        '</select><br>'+nav+'</div>'+
+        '<br><span class="badge badge-'+estadoPagoCls+' mt-1" id="estado-pago-badge-'+p.entrega_id+'">'+escHtml(estadoPagoTxt)+'</span>'+
+        '<br><a href="'+entregaRegistroUrl(p.entrega_id)+'" class="btn btn-primary btn-sm mt-1" style="min-width:150px;"><i class="fas fa-clipboard-check mr-1"></i>Registrar entrega</a><br>'+nav+
+        '<br><button type="button" class="btn btn-outline-danger btn-sm mt-1" title="Eliminar cliente de la ruta" onclick="eliminarParada(' + p.entrega_id + ', \'' + clienteNombreAttr + '\')"><i class="fas fa-trash-alt"></i></button>'+
+        '</div>'+
       '</div></div></div>';
   });
   var sp = document.getElementById('sinParadas'); if(sp) sp.remove();

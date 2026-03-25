@@ -12,6 +12,15 @@
 
 {% block content %}
 <style>
+  .section-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+  .section-toolbar .btn {
+    white-space: nowrap;
+  }
   .delete-toggle {
     position: relative;
     display: inline-flex;
@@ -31,10 +40,31 @@
   .delete-toggle.is-marked .js-delete-label {
     color: #6c757d;
   }
+  .inline-remove-btn {
+    color: #e74a3b;
+  }
+  @media (max-width: 768px) {
+    .section-toolbar {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    .section-toolbar .btn {
+      width: 100%;
+    }
+  }
 </style>
 
 <form method="post">
   {% csrf_token %}
+  {% if autocompletado_info %}
+    <div class="alert alert-{% if autocompletado_info.total_items %}info{% else %}warning{% endif %}">
+      {% if autocompletado_info.total_items %}
+        Se precargaron {{ autocompletado_info.total_items }} item(s) automaticamente desde la ruta.
+      {% else %}
+        No se encontraron items autogenerados para esta ruta. Solo se precargan cheques (A), creditos (C), transferencias (E) y entregas fallidas o devueltas (D). Los pagos en efectivo no generan items automaticos.
+      {% endif %}
+    </div>
+  {% endif %}
   {% if form.non_field_errors %}
     <div class="alert alert-danger">{{ form.non_field_errors }}</div>
   {% endif %}
@@ -86,14 +116,21 @@
   </div>
 
   <div class="card shadow mb-4">
-    <div class="card-header py-3"><h6 class="m-0 font-weight-bold text-primary">Crédito con documentos (A)</h6></div>
+    <div class="card-header py-3">
+      <div class="section-toolbar">
+        <h6 class="m-0 font-weight-bold text-primary">Crédito con documentos (A)</h6>
+        <button type="button" class="btn btn-outline-primary btn-sm" data-add-inline-row="a">
+          <i class="fas fa-plus mr-1"></i>Agregar línea
+        </button>
+      </div>
+    </div>
     <div class="card-body p-0">
       {{ formset_a.management_form }}
       <table class="table table-bordered table-sm mb-0">
         <thead class="thead-light"><tr><th>N° factura</th><th>Nombre cliente</th><th>Monto</th><th>Banco</th><th>Quitar</th></tr></thead>
-        <tbody>
+        <tbody id="inline-tbody-a">
           {% for f in formset_a %}
-          <tr>
+          <tr data-inline-row="a" data-existing="{% if f.instance.pk %}1{% else %}0{% endif %}">
             <td>{% for h in f.hidden_fields %}{{ h }}{% endfor %}{{ f.numero_factura }}</td>
             <td>{{ f.nombre_cliente }}</td><td>{{ f.monto }}</td><td>{{ f.banco }}</td>
             <td class="text-center">
@@ -105,7 +142,9 @@
                   </label>
                 </span>
               {% else %}
-                <span class="text-muted">—</span>
+                <button type="button" class="btn btn-link btn-sm inline-remove-btn p-0" data-remove-inline-row title="Quitar fila">
+                  <i class="fas fa-trash-alt"></i>
+                </button>
               {% endif %}
             </td>
           </tr>
@@ -116,14 +155,21 @@
   </div>
 
   <div class="card shadow mb-4">
-    <div class="card-header py-3"><h6 class="m-0 font-weight-bold text-primary">Devoluciones parciales (B)</h6></div>
+    <div class="card-header py-3">
+      <div class="section-toolbar">
+        <h6 class="m-0 font-weight-bold text-primary">Devoluciones parciales (B)</h6>
+        <button type="button" class="btn btn-outline-primary btn-sm" data-add-inline-row="b">
+          <i class="fas fa-plus mr-1"></i>Agregar línea
+        </button>
+      </div>
+    </div>
     <div class="card-body p-0">
       {{ formset_b.management_form }}
       <table class="table table-bordered table-sm mb-0">
         <thead class="thead-light"><tr><th>N° factura</th><th>Motivo</th><th>Monto</th><th>Quitar</th></tr></thead>
-        <tbody>
+        <tbody id="inline-tbody-b">
           {% for f in formset_b %}
-          <tr>
+          <tr data-inline-row="b" data-existing="{% if f.instance.pk %}1{% else %}0{% endif %}">
             <td>{% for h in f.hidden_fields %}{{ h }}{% endfor %}{{ f.numero_factura }}</td>
             <td>{{ f.motivo }}</td><td>{{ f.monto }}</td>
             <td class="text-center">
@@ -135,7 +181,9 @@
                   </label>
                 </span>
               {% else %}
-                <span class="text-muted">—</span>
+                <button type="button" class="btn btn-link btn-sm inline-remove-btn p-0" data-remove-inline-row title="Quitar fila">
+                  <i class="fas fa-trash-alt"></i>
+                </button>
               {% endif %}
             </td>
           </tr>
@@ -146,7 +194,14 @@
   </div>
 
   <div class="card shadow mb-4">
-    <div class="card-header py-3"><h6 class="m-0 font-weight-bold text-primary">Créditos de confianza (C)</h6></div>
+    <div class="card-header py-3">
+      <div class="section-toolbar">
+        <h6 class="m-0 font-weight-bold text-primary">Créditos de confianza (C)</h6>
+        <button type="button" class="btn btn-outline-primary btn-sm" data-add-inline-row="c">
+          <i class="fas fa-plus mr-1"></i>Agregar línea
+        </button>
+      </div>
+    </div>
     <div class="card-body p-0">
       <datalist id="autoriza-clientes-list">
         {% for nombre_cliente in clientes_ruta_sugeridos %}
@@ -156,9 +211,9 @@
       {{ formset_c.management_form }}
       <table class="table table-bordered table-sm mb-0">
         <thead class="thead-light"><tr><th>N° factura</th><th>Quién autoriza</th><th>Monto</th><th>Quitar</th></tr></thead>
-        <tbody>
+        <tbody id="inline-tbody-c">
           {% for f in formset_c %}
-          <tr>
+          <tr data-inline-row="c" data-existing="{% if f.instance.pk %}1{% else %}0{% endif %}">
             <td>{% for h in f.hidden_fields %}{{ h }}{% endfor %}{{ f.numero_factura }}</td>
             <td>{{ f.autoriza_credito }}</td><td>{{ f.monto }}</td>
             <td class="text-center">
@@ -170,7 +225,9 @@
                   </label>
                 </span>
               {% else %}
-                <span class="text-muted">—</span>
+                <button type="button" class="btn btn-link btn-sm inline-remove-btn p-0" data-remove-inline-row title="Quitar fila">
+                  <i class="fas fa-trash-alt"></i>
+                </button>
               {% endif %}
             </td>
           </tr>
@@ -183,14 +240,21 @@
   <div class="row">
     <div class="col-lg-6">
       <div class="card shadow mb-4">
-        <div class="card-header py-3"><h6 class="m-0 font-weight-bold text-primary">Facturas nulas (D)</h6></div>
+        <div class="card-header py-3">
+          <div class="section-toolbar">
+            <h6 class="m-0 font-weight-bold text-primary">Facturas nulas (D)</h6>
+            <button type="button" class="btn btn-outline-primary btn-sm" data-add-inline-row="d">
+              <i class="fas fa-plus mr-1"></i>Agregar línea
+            </button>
+          </div>
+        </div>
         <div class="card-body p-0">
           {{ formset_d.management_form }}
           <table class="table table-bordered table-sm mb-0">
             <thead class="thead-light"><tr><th>N° factura</th><th>Monto</th><th>Quitar</th></tr></thead>
-            <tbody>
+            <tbody id="inline-tbody-d">
               {% for f in formset_d %}
-              <tr>
+              <tr data-inline-row="d" data-existing="{% if f.instance.pk %}1{% else %}0{% endif %}">
                 <td>{% for h in f.hidden_fields %}{{ h }}{% endfor %}{{ f.numero_factura }}</td>
                 <td>{{ f.monto }}</td>
                 <td class="text-center">
@@ -202,7 +266,9 @@
                       </label>
                     </span>
                   {% else %}
-                    <span class="text-muted">—</span>
+                    <button type="button" class="btn btn-link btn-sm inline-remove-btn p-0" data-remove-inline-row title="Quitar fila">
+                      <i class="fas fa-trash-alt"></i>
+                    </button>
                   {% endif %}
                 </td>
               </tr>
@@ -214,14 +280,21 @@
     </div>
     <div class="col-lg-6">
       <div class="card shadow mb-4">
-        <div class="card-header py-3"><h6 class="m-0 font-weight-bold text-primary">Depósitos o transferencias (E)</h6></div>
+        <div class="card-header py-3">
+          <div class="section-toolbar">
+            <h6 class="m-0 font-weight-bold text-primary">Depósitos o transferencias (E)</h6>
+            <button type="button" class="btn btn-outline-primary btn-sm" data-add-inline-row="e">
+              <i class="fas fa-plus mr-1"></i>Agregar línea
+            </button>
+          </div>
+        </div>
         <div class="card-body p-0">
           {{ formset_e.management_form }}
           <table class="table table-bordered table-sm mb-0">
             <thead class="thead-light"><tr><th>N° factura</th><th>Monto</th><th>Quitar</th></tr></thead>
-            <tbody>
+            <tbody id="inline-tbody-e">
               {% for f in formset_e %}
-              <tr>
+              <tr data-inline-row="e" data-existing="{% if f.instance.pk %}1{% else %}0{% endif %}">
                 <td>{% for h in f.hidden_fields %}{{ h }}{% endfor %}{{ f.numero_factura }}</td>
                 <td>{{ f.monto }}</td>
                 <td class="text-center">
@@ -233,7 +306,9 @@
                       </label>
                     </span>
                   {% else %}
-                    <span class="text-muted">—</span>
+                    <button type="button" class="btn btn-link btn-sm inline-remove-btn p-0" data-remove-inline-row title="Quitar fila">
+                      <i class="fas fa-trash-alt"></i>
+                    </button>
                   {% endif %}
                 </td>
               </tr>
@@ -251,9 +326,73 @@
   </div>
 </form>
 
+<template id="inline-template-a">
+  <tr data-inline-row="a" data-existing="0">
+    <td>{% for h in formset_a.empty_form.hidden_fields %}{{ h }}{% endfor %}{{ formset_a.empty_form.numero_factura }}</td>
+    <td>{{ formset_a.empty_form.nombre_cliente }}</td>
+    <td>{{ formset_a.empty_form.monto }}</td>
+    <td>{{ formset_a.empty_form.banco }}</td>
+    <td class="text-center">
+      <button type="button" class="btn btn-link btn-sm inline-remove-btn p-0" data-remove-inline-row title="Quitar fila">
+        <i class="fas fa-trash-alt"></i>
+      </button>
+    </td>
+  </tr>
+</template>
+
+<template id="inline-template-b">
+  <tr data-inline-row="b" data-existing="0">
+    <td>{% for h in formset_b.empty_form.hidden_fields %}{{ h }}{% endfor %}{{ formset_b.empty_form.numero_factura }}</td>
+    <td>{{ formset_b.empty_form.motivo }}</td>
+    <td>{{ formset_b.empty_form.monto }}</td>
+    <td class="text-center">
+      <button type="button" class="btn btn-link btn-sm inline-remove-btn p-0" data-remove-inline-row title="Quitar fila">
+        <i class="fas fa-trash-alt"></i>
+      </button>
+    </td>
+  </tr>
+</template>
+
+<template id="inline-template-c">
+  <tr data-inline-row="c" data-existing="0">
+    <td>{% for h in formset_c.empty_form.hidden_fields %}{{ h }}{% endfor %}{{ formset_c.empty_form.numero_factura }}</td>
+    <td>{{ formset_c.empty_form.autoriza_credito }}</td>
+    <td>{{ formset_c.empty_form.monto }}</td>
+    <td class="text-center">
+      <button type="button" class="btn btn-link btn-sm inline-remove-btn p-0" data-remove-inline-row title="Quitar fila">
+        <i class="fas fa-trash-alt"></i>
+      </button>
+    </td>
+  </tr>
+</template>
+
+<template id="inline-template-d">
+  <tr data-inline-row="d" data-existing="0">
+    <td>{% for h in formset_d.empty_form.hidden_fields %}{{ h }}{% endfor %}{{ formset_d.empty_form.numero_factura }}</td>
+    <td>{{ formset_d.empty_form.monto }}</td>
+    <td class="text-center">
+      <button type="button" class="btn btn-link btn-sm inline-remove-btn p-0" data-remove-inline-row title="Quitar fila">
+        <i class="fas fa-trash-alt"></i>
+      </button>
+    </td>
+  </tr>
+</template>
+
+<template id="inline-template-e">
+  <tr data-inline-row="e" data-existing="0">
+    <td>{% for h in formset_e.empty_form.hidden_fields %}{{ h }}{% endfor %}{{ formset_e.empty_form.numero_factura }}</td>
+    <td>{{ formset_e.empty_form.monto }}</td>
+    <td class="text-center">
+      <button type="button" class="btn btn-link btn-sm inline-remove-btn p-0" data-remove-inline-row title="Quitar fila">
+        <i class="fas fa-trash-alt"></i>
+      </button>
+    </td>
+  </tr>
+</template>
+
 <script>
   document.addEventListener('DOMContentLoaded', function () {
-    document.querySelectorAll('.delete-toggle').forEach(function (wrap) {
+    function bindDeleteToggle(wrap) {
       const checkbox = wrap.querySelector('input[type="checkbox"]');
       if (!checkbox) return;
 
@@ -263,7 +402,73 @@
 
       checkbox.addEventListener('change', sync);
       sync();
+    }
+
+    document.querySelectorAll('.delete-toggle').forEach(bindDeleteToggle);
+
+    function addInlineRow(prefix) {
+      var template = document.getElementById('inline-template-' + prefix);
+      var tbody = document.getElementById('inline-tbody-' + prefix);
+      var totalFormsInput = document.getElementById('id_' + prefix + '-TOTAL_FORMS');
+      if (!template || !tbody || !totalFormsInput) {
+        return;
+      }
+
+      var nextIndex = parseInt(totalFormsInput.value, 10);
+      var html = template.innerHTML.replace(/__prefix__/g, nextIndex);
+      tbody.insertAdjacentHTML('beforeend', html.trim());
+      totalFormsInput.value = String(nextIndex + 1);
+
+      var newRow = tbody.querySelector('tr:last-child');
+      if (newRow) {
+        newRow.querySelectorAll('.delete-toggle').forEach(bindDeleteToggle);
+        var firstInput = newRow.querySelector('input, select, textarea');
+        if (firstInput) {
+          firstInput.focus();
+        }
+      }
+    }
+
+    document.addEventListener('click', function (event) {
+      var addButton = event.target.closest('[data-add-inline-row]');
+      if (addButton) {
+        addInlineRow(addButton.getAttribute('data-add-inline-row'));
+        return;
+      }
+
+      var removeButton = event.target.closest('[data-remove-inline-row]');
+      if (removeButton) {
+        var row = removeButton.closest('tr[data-inline-row]');
+        if (row) {
+          row.remove();
+        }
+      }
     });
+
+    var kmInicialInput = document.getElementById('id_kilometraje_inicial');
+    var kmFinalInput = document.getElementById('id_kilometraje_final');
+    var kmTotalInput = document.getElementById('id_total_kilometros_recorridos');
+
+    function parseKm(value) {
+      var parsed = parseFloat((value || '').toString().replace(',', '.'));
+      return isNaN(parsed) ? 0 : parsed;
+    }
+
+    function calcularKmTotal() {
+      if (!kmInicialInput || !kmFinalInput || !kmTotalInput) {
+        return;
+      }
+      var inicial = parseKm(kmInicialInput.value);
+      var finalKm = parseKm(kmFinalInput.value);
+      var total = finalKm - inicial;
+      kmTotalInput.value = total.toFixed(1);
+    }
+
+    if (kmInicialInput && kmFinalInput && kmTotalInput) {
+      kmInicialInput.addEventListener('input', calcularKmTotal);
+      kmFinalInput.addEventListener('input', calcularKmTotal);
+      calcularKmTotal();
+    }
   });
 </script>
 {% endblock %}

@@ -68,6 +68,7 @@ LOCAL_APPS = [
     'deliveries',
     'history',
     'maps',
+    'planner',
     'routes',
     'rendiciones',
     'dashboard',

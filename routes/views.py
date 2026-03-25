@@ -11,10 +11,12 @@ from django.urls import reverse_lazy
 from django.shortcuts import get_object_or_404, redirect, render
 from django.http import JsonResponse
 from django.db.models import Q
+from django.db import transaction
 from django.db.utils import OperationalError, ProgrammingError
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils import timezone
-from .models import RutaDia, ParadaRuta, Entrega
-from .forms import RutaDiaForm, EntregaForm, EntregaEstadoForm
+from .models import RutaDia, ParadaRuta, Entrega, EntregaPago
+from .forms import RutaDiaForm, EntregaForm, EntregaEstadoForm, build_entrega_pago_formset
 from clients.models import Cliente
 
 
@@ -126,18 +128,66 @@ def entregas_eliminar_masiva(request):
 @login_required
 def entrega_actualizar_estado(request, pk):
     entrega = get_object_or_404(Entrega, pk=pk)
+    next_url = request.POST.get('next') or request.GET.get('next')
+    if next_url and not url_has_allowed_host_and_scheme(
+        url=next_url,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        next_url = None
+
     if request.method == 'POST':
         form = EntregaEstadoForm(request.POST, request.FILES, instance=entrega)
-        if form.is_valid():
-            obj = form.save(commit=False)
-            if obj.estado == 'entregado' and not obj.fecha_entrega:
-                obj.fecha_entrega = timezone.now()
-            obj.save()
-            messages.success(request, 'Estado actualizado correctamente.')
+        pagos_formset = build_entrega_pago_formset(data=request.POST, instance=entrega)
+        if form.is_valid() and pagos_formset.is_valid():
+            with transaction.atomic():
+                obj = form.save(commit=False)
+                if obj.estado == 'entregado' and not obj.fecha_entrega:
+                    obj.fecha_entrega = timezone.now()
+
+                if form.changed_data or any(f.has_changed() for f in pagos_formset.forms):
+                    obj.pago_registrado_por = request.user
+                    obj.fecha_registro_pago = timezone.now()
+
+                obj.save()
+
+                pagos_formset.instance = obj
+                pagos = pagos_formset.save(commit=False)
+                for pago in pagos:
+                    pago.registrado_por = request.user
+                    pago.save()
+
+                for pago in pagos_formset.deleted_objects:
+                    pago.delete()
+
+            messages.success(request, 'Estado y pagos actualizados correctamente.')
+            if next_url:
+                return redirect(next_url)
             return redirect('routes:entregas_detail', pk=pk)
     else:
         form = EntregaEstadoForm(instance=entrega)
-    return render(request, 'deliveries/actualizar_estado.html', {'form': form, 'entrega': entrega})
+        pagos_formset = build_entrega_pago_formset(instance=entrega)
+    return render(
+        request,
+        'deliveries/actualizar_estado.html',
+        {
+            'form': form,
+            'pagos_formset': pagos_formset,
+            'entrega': entrega,
+            'next_url': next_url,
+        },
+    )
+
+
+@login_required
+def eliminar_pago_entrega(request, pk, pago_pk):
+    if request.method != 'POST':
+        return JsonResponse({'ok': False, 'error': 'Metodo no permitido.'}, status=405)
+
+    entrega = get_object_or_404(Entrega, pk=pk)
+    pago = get_object_or_404(EntregaPago, pk=pago_pk, entrega=entrega)
+    pago.delete()
+    return JsonResponse({'ok': True, 'pago_id': pago_pk})
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -172,6 +222,20 @@ def _nearest_neighbor_route(points):
         route.append(nearest)
         current = nearest
     return [p['id'] for p in route]
+
+
+def _resumen_pago_entrega(entrega):
+    pagos_qs = getattr(entrega, 'pagos', None)
+    if pagos_qs is None:
+        total_pagado = 0
+    else:
+        total_pagado = sum((p.monto or 0) for p in pagos_qs.all())
+
+    return {
+        'estado_pago': entrega.estado_pago,
+        'estado_pago_display': entrega.get_estado_pago_display(),
+        'total_pagado': float(total_pagado or 0),
+    }
 
 
 def _ocr_extract_names(image_path):
@@ -367,7 +431,7 @@ class RutaDetailView(LoginRequiredMixin, DetailView):
             'entrega__cliente',
             'entrega__empresa',
             'entrega__conductor',
-        ).order_by('orden')
+        ).prefetch_related('entrega__pagos').order_by('orden')
         ctx['rendicion'] = getattr(self.object, 'rendicion', None)
         return ctx
 
@@ -509,7 +573,7 @@ def crear_entregas_desde_ruta(request, pk):
     points = []
     for e in todas_las_entregas:
         c = e.cliente
-        if c.latitud and c.longitud:
+        if c.latitud is not None and c.longitud is not None:
             points.append({
                 'id': e.pk,
                 'lat': float(c.latitud),
@@ -518,7 +582,12 @@ def crear_entregas_desde_ruta(request, pk):
             })
 
     if len(points) >= 2:
-        ordered_ids = _nearest_neighbor_route(points)
+        optimized_ids = _nearest_neighbor_route(points)
+        optimized_set = set(optimized_ids)
+        # Mantiene en la ruta entregas sin coordenadas (o fuera del optimizador)
+        # para que agregar cliente manual nunca "desaparezca" del resultado.
+        restantes_ids = [e.pk for e in todas_las_entregas if e.pk not in optimized_set]
+        ordered_ids = optimized_ids + restantes_ids
     else:
         ordered_ids = [e.pk for e in todas_las_entregas]
 
@@ -530,6 +599,7 @@ def crear_entregas_desde_ruta(request, pk):
             entrega = Entrega.objects.get(pk=eid)
             parada = ParadaRuta.objects.create(ruta=ruta, entrega=entrega, orden=i)
             c = entrega.cliente
+            resumen_pago = _resumen_pago_entrega(entrega)
             paradas_guardadas.append({
                 'orden': i,
                 'entrega_id': eid,
@@ -544,8 +614,11 @@ def crear_entregas_desde_ruta(request, pk):
                 'fecha_entrega': entrega.fecha_entrega.strftime('%d-%m-%Y %H:%M') if entrega.fecha_entrega else '',
                 'estado': entrega.estado,
                 'estado_display': entrega.get_estado_display(),
-                'lat': float(c.latitud) if c.latitud else None,
-                'lon': float(c.longitud) if c.longitud else None,
+                'estado_pago': resumen_pago['estado_pago'],
+                'estado_pago_display': resumen_pago['estado_pago_display'],
+                'total_pagado': resumen_pago['total_pagado'],
+                'lat': float(c.latitud) if c.latitud is not None else None,
+                'lon': float(c.longitud) if c.longitud is not None else None,
             })
         except Entrega.DoesNotExist:
             pass
@@ -591,6 +664,7 @@ def optimizar_ruta(request, pk):
         entrega = Entrega.objects.get(pk=eid)
         ParadaRuta.objects.create(ruta=ruta, entrega=entrega, orden=i)
         c = entrega.cliente
+        resumen_pago = _resumen_pago_entrega(entrega)
         paradas_guardadas.append({
             'orden': i,
             'entrega_id': eid,
@@ -605,6 +679,9 @@ def optimizar_ruta(request, pk):
             'fecha_entrega': entrega.fecha_entrega.strftime('%d-%m-%Y %H:%M') if entrega.fecha_entrega else '',
             'estado': entrega.estado,
             'estado_display': entrega.get_estado_display(),
+            'estado_pago': resumen_pago['estado_pago'],
+            'estado_pago_display': resumen_pago['estado_pago_display'],
+            'total_pagado': resumen_pago['total_pagado'],
             'lat': float(c.latitud) if c.latitud else None,
             'lon': float(c.longitud) if c.longitud else None,
         })
@@ -689,6 +766,7 @@ def reoptimizar_desde_posicion(request, pk):
             entrega = Entrega.objects.get(pk=eid)
             ParadaRuta.objects.create(ruta=ruta, entrega=entrega, orden=orden)
             c = entrega.cliente
+            resumen_pago = _resumen_pago_entrega(entrega)
             nueva_lista.append({
                 'orden': orden,
                 'entrega_id': eid,
@@ -703,6 +781,9 @@ def reoptimizar_desde_posicion(request, pk):
                 'fecha_entrega': entrega.fecha_entrega.strftime('%d-%m-%Y %H:%M') if entrega.fecha_entrega else '',
                 'estado': entrega.estado,
                 'estado_display': entrega.get_estado_display(),
+                'estado_pago': resumen_pago['estado_pago'],
+                'estado_pago_display': resumen_pago['estado_pago_display'],
+                'total_pagado': resumen_pago['total_pagado'],
                 'lat': float(c.latitud) if c.latitud else None,
                 'lon': float(c.longitud) if c.longitud else None,
                 'waze': c.url_waze if c.tiene_coordenadas else None,
@@ -718,6 +799,7 @@ def reoptimizar_desde_posicion(request, pk):
             entrega = Entrega.objects.get(pk=p_data['id'])
             ParadaRuta.objects.create(ruta=ruta, entrega=entrega, orden=orden)
             c = entrega.cliente
+            resumen_pago = _resumen_pago_entrega(entrega)
             nueva_lista.append({
                 'orden': orden,
                 'entrega_id': p_data['id'],
@@ -732,6 +814,9 @@ def reoptimizar_desde_posicion(request, pk):
                 'fecha_entrega': entrega.fecha_entrega.strftime('%d-%m-%Y %H:%M') if entrega.fecha_entrega else '',
                 'estado': entrega.estado,
                 'estado_display': entrega.get_estado_display(),
+                'estado_pago': resumen_pago['estado_pago'],
+                'estado_pago_display': resumen_pago['estado_pago_display'],
+                'total_pagado': resumen_pago['total_pagado'],
                 'lat': float(c.latitud) if c.latitud else None,
                 'lon': float(c.longitud) if c.longitud else None,
                 'waze': c.url_waze if c.tiene_coordenadas else None,
@@ -782,4 +867,72 @@ def actualizar_estado_parada(request, pk):
         'estado': entrega.estado,
         'estado_display': entrega.get_estado_display(),
         'fecha_entrega': entrega.fecha_entrega.strftime('%d-%m-%Y %H:%M') if entrega.fecha_entrega else '',
+    })
+
+
+def _serializar_paradas_ruta(ruta):
+    paradas = ruta.paradas.select_related('entrega__cliente', 'entrega__empresa', 'entrega__conductor').prefetch_related('entrega__pagos').order_by('orden', 'id')
+    data = []
+    for p in paradas:
+        entrega = p.entrega
+        c = entrega.cliente
+        resumen_pago = _resumen_pago_entrega(entrega)
+        data.append({
+            'orden': p.orden,
+            'entrega_id': entrega.pk,
+            'cliente': c.nombre,
+            'comuna': c.comuna or '–',
+            'observaciones': c.observaciones or '',
+            'empresa': entrega.empresa.nombre if entrega.empresa else '',
+            'conductor': entrega.conductor.get_full_name() if entrega.conductor else '',
+            'descripcion': entrega.descripcion or '',
+            'observacion_entrega': entrega.observacion or '',
+            'fecha_programada': entrega.fecha_programada.strftime('%d-%m-%Y') if entrega.fecha_programada else '',
+            'fecha_entrega': entrega.fecha_entrega.strftime('%d-%m-%Y %H:%M') if entrega.fecha_entrega else '',
+            'estado': entrega.estado,
+            'estado_display': entrega.get_estado_display(),
+            'estado_pago': resumen_pago['estado_pago'],
+            'estado_pago_display': resumen_pago['estado_pago_display'],
+            'total_pagado': resumen_pago['total_pagado'],
+            'lat': float(c.latitud) if c.latitud is not None else None,
+            'lon': float(c.longitud) if c.longitud is not None else None,
+        })
+    return data
+
+
+@login_required
+def eliminar_parada_ruta(request, pk):
+    """
+    Elimina una parada de la ruta (cliente) y reordena la secuencia.
+    POST JSON: {entrega_id: int}
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Método no permitido.'}, status=405)
+
+    ruta = get_object_or_404(RutaDia, pk=pk)
+
+    try:
+        body = json.loads(request.body)
+        entrega_id = int(body.get('entrega_id'))
+    except (json.JSONDecodeError, ValueError, TypeError):
+        return JsonResponse({'error': 'Datos inválidos.'}, status=400)
+
+    parada = ParadaRuta.objects.filter(ruta=ruta, entrega_id=entrega_id).first()
+    if not parada:
+        return JsonResponse({'error': 'La parada no existe en esta ruta.'}, status=404)
+
+    parada.delete()
+
+    # Reordena para evitar huecos en la numeración de paradas.
+    paradas_restantes = list(ruta.paradas.order_by('orden', 'id'))
+    for index, p in enumerate(paradas_restantes, start=1):
+        if p.orden != index:
+            p.orden = index
+            p.save(update_fields=['orden'])
+
+    paradas_data = _serializar_paradas_ruta(ruta)
+    return JsonResponse({
+        'ok': True,
+        'total_paradas': len(paradas_data),
+        'paradas': paradas_data,
     })

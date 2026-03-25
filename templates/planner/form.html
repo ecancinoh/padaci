@@ -1,0 +1,76 @@
+{% extends 'base.html' %}
+{% block title %}{{ titulo }} - PADACI{% endblock %}
+{% block active_planner %}active{% endblock %}
+
+{% block page_heading %}
+<div class="d-sm-flex align-items-center justify-content-between mb-4">
+  <h1 class="h3 mb-0 text-gray-800"><i class="fas fa-calendar-alt mr-2 text-primary"></i>{{ titulo }}</h1>
+  <a href="{% url 'planner:list' %}" class="btn btn-secondary btn-sm"><i class="fas fa-arrow-left mr-1"></i> Volver</a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-xl-10">
+    <div class="card shadow mb-4">
+      <div class="card-header py-3"><h6 class="m-0 font-weight-bold text-primary">Configuracion de plan</h6></div>
+      <div class="card-body">
+        <form method="post">
+          {% csrf_token %}
+
+          <div class="form-group">
+            <label for="{{ form.nombre.id_for_label }}" class="font-weight-bold">Nombre del plan</label>
+            {{ form.nombre }}
+            {% if form.nombre.errors %}<div class="text-danger small mt-1">{{ form.nombre.errors }}</div>{% endif %}
+          </div>
+
+          <div class="alert alert-info py-2">
+            Este plan toma automaticamente todos los clientes de la aplicacion Clientes y los distribuye de lunes a viernes.
+          </div>
+
+          <h6 class="font-weight-bold text-gray-700">Restricciones operativas</h6>
+          <div class="row">
+            <div class="col-md-3">
+              <label>Maximo horas jornada</label>
+              {{ form.max_horas_jornada }}
+            </div>
+            <div class="col-md-3">
+              <label>Velocidad promedio km/h</label>
+              {{ form.velocidad_promedio_kmh }}
+            </div>
+            <div class="col-md-3">
+              <label>Minutos por cliente</label>
+              {{ form.minutos_servicio_por_cliente }}
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="col-md-6">
+              <div class="form-check mb-3">
+                {{ form.activo }}
+                <label class="form-check-label" for="{{ form.activo.id_for_label }}">Plan activo</label>
+              </div>
+            </div>
+          </div>
+
+          <hr>
+          <h6 class="font-weight-bold text-gray-700">Capacidad por dia (opcional)</h6>
+          <p class="text-muted small">Si dejas un dia vacio, se considera sin limite.</p>
+
+          <div class="row">
+            <div class="col-md-2"><label>Lunes</label>{{ form.capacidad_lunes }}</div>
+            <div class="col-md-2"><label>Martes</label>{{ form.capacidad_martes }}</div>
+            <div class="col-md-2"><label>Miercoles</label>{{ form.capacidad_miercoles }}</div>
+            <div class="col-md-2"><label>Jueves</label>{{ form.capacidad_jueves }}</div>
+            <div class="col-md-2"><label>Viernes</label>{{ form.capacidad_viernes }}</div>
+          </div>
+
+          <hr>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save mr-1"></i> Guardar</button>
+          <a href="{% url 'planner:list' %}" class="btn btn-secondary ml-2">Cancelar</a>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
