@@ -118,7 +118,7 @@
   <div class="card shadow mb-4">
     <div class="card-header py-3">
       <div class="section-toolbar">
-        <h6 class="m-0 font-weight-bold text-primary">Crédito con documentos (A)</h6>
+        <h6 class="m-0 font-weight-bold text-primary">Cheques (A)</h6>
         <button type="button" class="btn btn-outline-primary btn-sm" data-add-inline-row="a">
           <i class="fas fa-plus mr-1"></i>Agregar línea
         </button>
@@ -468,6 +468,44 @@
       kmInicialInput.addEventListener('input', calcularKmTotal);
       kmFinalInput.addEventListener('input', calcularKmTotal);
       calcularKmTotal();
+    }
+
+    var facturasTotalesInput = document.getElementById('id_facturas_totales');
+    var facturasEntregadasInput = document.getElementById('id_facturas_entregadas');
+    var facturasNulasInput = document.getElementById('id_facturas_nulas');
+    var facturasNulasAuto = true;
+
+    function parseEnteroNoNegativo(value) {
+      var parsed = parseInt((value || '').toString().trim(), 10);
+      if (isNaN(parsed) || parsed < 0) {
+        return 0;
+      }
+      return parsed;
+    }
+
+    function calcularFacturasNulas() {
+      if (!facturasTotalesInput || !facturasEntregadasInput || !facturasNulasInput || !facturasNulasAuto) {
+        return;
+      }
+      var totales = parseEnteroNoNegativo(facturasTotalesInput.value);
+      var entregadas = parseEnteroNoNegativo(facturasEntregadasInput.value);
+      var nulas = Math.max(totales - entregadas, 0);
+      facturasNulasInput.value = String(nulas);
+    }
+
+    if (facturasTotalesInput && facturasEntregadasInput && facturasNulasInput) {
+      facturasTotalesInput.addEventListener('input', calcularFacturasNulas);
+      facturasEntregadasInput.addEventListener('input', calcularFacturasNulas);
+
+      facturasNulasInput.addEventListener('input', function () {
+        var valor = (facturasNulasInput.value || '').trim();
+        if (valor === '') {
+          facturasNulasAuto = true;
+          calcularFacturasNulas();
+          return;
+        }
+        facturasNulasAuto = false;
+      });
     }
   });
 </script>

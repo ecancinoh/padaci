@@ -151,19 +151,26 @@ class RendicionRepartoForm(forms.ModelForm):
         self.fields['total_kilometros_recorridos'].help_text = 'Automático (Kilometraje final - Kilometraje inicial), editable manualmente si se requiere.'
         self.fields['total_consolidado'].help_text = 'Se trae automáticamente desde Total consolidado de la Ruta del Día.'
         self.fields['total_consolidado'].disabled = True
-        self.fields['menos_items'].help_text = 'Automático: suma de A + B + C + D + E.'
+        self.fields['menos_items'].help_text = 'Automático: suma de A + B + C + D + E + estacionamientos.'
         self.fields['menos_items'].disabled = True
-        self.fields['total_dinero_recibir'].help_text = 'Automático: Total consolidado - Menos ítems (A,B,C,D,E).'
+        self.fields['total_dinero_recibir'].help_text = 'Automático: Total consolidado - Menos ítems (A,B,C,D,E + estacionamientos).'
         self.fields['total_dinero_recibir'].disabled = True
+        self.fields['facturas_nulas'].help_text = 'Automático: Facturas totales - Facturas entregadas. Puedes editarlo manualmente.'
 
     def clean(self):
         cleaned_data = super().clean()
         km_inicial = cleaned_data.get('kilometraje_inicial') or Decimal('0')
         km_final = cleaned_data.get('kilometraje_final') or Decimal('0')
         total_km = cleaned_data.get('total_kilometros_recorridos')
+        facturas_totales = cleaned_data.get('facturas_totales') or 0
+        facturas_entregadas = cleaned_data.get('facturas_entregadas') or 0
 
         if total_km is None:
             cleaned_data['total_kilometros_recorridos'] = km_final - km_inicial
+
+        # Se autocalcula mientras el usuario no edite manualmente el campo.
+        if 'facturas_nulas' not in self.changed_data:
+            cleaned_data['facturas_nulas'] = max(facturas_totales - facturas_entregadas, 0)
 
         return cleaned_data
 

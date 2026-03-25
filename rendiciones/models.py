@@ -44,7 +44,7 @@ class RendicionReparto(models.Model):
         total_c = self.creditos_confianza.aggregate(total=Sum('monto'))['total'] or Decimal('0')
         total_d = self.facturas_nulas_detalle.aggregate(total=Sum('monto'))['total'] or Decimal('0')
         total_e = self.depositos_transferencias.aggregate(total=Sum('monto'))['total'] or Decimal('0')
-        return total_a + total_b + total_c + total_d + total_e
+        return total_a + total_b + total_c + total_d + total_e + (self.estacionamientos or Decimal('0'))
 
     def calcular_total_dinero_recibir(self):
         return (self.total_consolidado or Decimal('0')) - (self.menos_items or Decimal('0'))
