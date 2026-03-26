@@ -7,6 +7,9 @@
   <h1 class="h3 mb-0 text-gray-800"><i class="fas fa-user mr-2 text-primary"></i>{{ usuario.get_full_name }}</h1>
   <div>
     <a href="{% url 'accounts:update' usuario.pk %}" class="btn btn-warning btn-sm"><i class="fas fa-edit mr-1"></i> Editar</a>
+    {% if request.user == usuario %}
+    <a href="{% url 'accounts:cambiar_password' %}" class="btn btn-info btn-sm"><i class="fas fa-key mr-1"></i> Cambiar Contraseña</a>
+    {% endif %}
     <a href="{% url 'accounts:list' %}" class="btn btn-secondary btn-sm"><i class="fas fa-arrow-left mr-1"></i> Volver</a>
   </div>
 </div>

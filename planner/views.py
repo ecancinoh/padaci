@@ -1,6 +1,7 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
+from accounts.mixins import RolRestringidoMixin, rol_restringido
 from django.db.models import Count
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
@@ -21,7 +22,7 @@ DIA_LABELS = {
     'vie': 'Viernes',
 }
 
-class PlanificacionListView(LoginRequiredMixin, ListView):
+class PlanificacionListView(RolRestringidoMixin, ListView):
     model = PlanificacionSemanal
     template_name = 'planner/list.html'
     context_object_name = 'planes'
@@ -40,7 +41,7 @@ class PlanificacionListView(LoginRequiredMixin, ListView):
         return queryset
 
 
-class PlanificacionCreateView(LoginRequiredMixin, CreateView):
+class PlanificacionCreateView(RolRestringidoMixin, CreateView):
     model = PlanificacionSemanal
     form_class = PlanificacionSemanalForm
     template_name = 'planner/form.html'
@@ -57,7 +58,7 @@ class PlanificacionCreateView(LoginRequiredMixin, CreateView):
         return ctx
 
 
-class PlanificacionUpdateView(LoginRequiredMixin, UpdateView):
+class PlanificacionUpdateView(RolRestringidoMixin, UpdateView):
     model = PlanificacionSemanal
     form_class = PlanificacionSemanalForm
     template_name = 'planner/form.html'
@@ -74,7 +75,7 @@ class PlanificacionUpdateView(LoginRequiredMixin, UpdateView):
         return ctx
 
 
-class PlanificacionDeleteView(LoginRequiredMixin, DeleteView):
+class PlanificacionDeleteView(RolRestringidoMixin, DeleteView):
     model = PlanificacionSemanal
     template_name = 'planner/confirm_delete.html'
     success_url = reverse_lazy('planner:list')
@@ -195,7 +196,7 @@ def _contexto_detail(plan):
     }
 
 
-@login_required
+@rol_restringido
 def planificacion_detail(request, pk):
     plan = get_object_or_404(PlanificacionSemanal, pk=pk)
 

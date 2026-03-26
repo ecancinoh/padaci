@@ -1,6 +1,7 @@
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from accounts.mixins import RolRestringidoMixin, rol_restringido
 from django.views.generic import ListView, DetailView
 from django.shortcuts import render
 from django.db.models import Count, Q
@@ -9,7 +10,7 @@ from .models import HistorialDia, DetalleHistorial
 from routes.models import Entrega
 
 
-class HistorialListView(LoginRequiredMixin, ListView):
+class HistorialListView(RolRestringidoMixin, ListView):
     model = HistorialDia
     template_name = 'history/list.html'
     context_object_name = 'historiales'
@@ -29,7 +30,7 @@ class HistorialListView(LoginRequiredMixin, ListView):
         return qs
 
 
-class HistorialDetailView(LoginRequiredMixin, DetailView):
+class HistorialDetailView(RolRestringidoMixin, DetailView):
     model = HistorialDia
     template_name = 'history/detail.html'
     context_object_name = 'historial'
@@ -40,7 +41,7 @@ class HistorialDetailView(LoginRequiredMixin, DetailView):
         return ctx
 
 
-@login_required
+@rol_restringido
 def generar_historial_hoy(request):
     """Genera o actualiza el historial del día de hoy a partir de las entregas registradas."""
     hoy = timezone.localdate()

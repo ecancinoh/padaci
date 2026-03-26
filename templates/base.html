@@ -52,6 +52,7 @@
       <div class="sidebar-heading">Administración</div>
 
       <!-- Usuarios -->
+      {% if user.rol != 'conductor' and user.rol != 'peoneta' %}
       <li class="nav-item {% block active_accounts %}{% endblock %}">
         {% url 'accounts:list' as url_accounts_list %}
         <a class="nav-link" href="{{ url_accounts_list|default:'#' }}">
@@ -59,8 +60,10 @@
           <span>Usuarios</span>
         </a>
       </li>
+      {% endif %}
 
       <!-- Empresas -->
+      {% if user.rol != 'conductor' and user.rol != 'peoneta' %}
       <li class="nav-item {% block active_companies %}{% endblock %}">
         {% url 'companies:list' as url_companies_list %}
         <a class="nav-link" href="{{ url_companies_list|default:'#' }}">
@@ -68,6 +71,7 @@
           <span>Empresas</span>
         </a>
       </li>
+      {% endif %}
 
       <!-- Clientes -->
       <li class="nav-item {% block active_clients %}{% endblock %}">
@@ -90,6 +94,7 @@
         </a>
       </li>
 
+      {% if user.rol != 'conductor' and user.rol != 'peoneta' %}
       <li class="nav-item {% block active_planner %}{% endblock %}">
         {% url 'planner:list' as url_planner_list %}
         <a class="nav-link" href="{{ url_planner_list|default:'#' }}">
@@ -97,6 +102,7 @@
           <span>Planificación Semanal</span>
         </a>
       </li>
+      {% endif %}
 
       <li class="nav-item {% block active_rendiciones %}{% endblock %}">
         {% url 'rendiciones:list' as url_rendiciones_list %}
@@ -107,6 +113,7 @@
       </li>
 
       <!-- Historial -->
+      {% if user.rol != 'conductor' and user.rol != 'peoneta' %}
       <li class="nav-item {% block active_history %}{% endblock %}">
         {% url 'history:list' as url_history_list %}
         <a class="nav-link" href="{{ url_history_list|default:'#' }}">
@@ -114,6 +121,7 @@
           <span>Historial</span>
         </a>
       </li>
+      {% endif %}
 
       <hr class="sidebar-divider">
       <div class="sidebar-heading">Geolocalización</div>
@@ -173,6 +181,10 @@
                 {% url 'accounts:detail' user.pk as url_accounts_detail %}
                 <a class="dropdown-item" href="{{ url_accounts_detail|default:'#' }}">
                   <i class="fas fa-user fa-sm fa-fw mr-2 text-gray-400"></i> Mi Perfil
+                </a>
+                {% url 'accounts:cambiar_password' as url_cambiar_password %}
+                <a class="dropdown-item" href="{{ url_cambiar_password|default:'#' }}">
+                  <i class="fas fa-key fa-sm fa-fw mr-2 text-gray-400"></i> Cambiar Contraseña
                 </a>
                 <div class="dropdown-divider"></div>
                 {% url 'accounts:logout' as url_accounts_logout %}

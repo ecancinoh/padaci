@@ -5,8 +5,9 @@ from django.contrib import messages
 from django.shortcuts import render, redirect, get_object_or_404
 from django.views.generic import ListView, CreateView, UpdateView, DeleteView, DetailView
 from django.urls import reverse_lazy
+from .mixins import RolRestringidoMixin
 from .models import CustomUser
-from .forms import CustomAuthForm, CustomUserCreationForm, CustomUserUpdateForm
+from .forms import CustomAuthForm, CustomUserCreationForm, CustomUserUpdateForm, PasswordCambioForm
 
 
 def login_view(request):
@@ -27,7 +28,7 @@ def logout_view(request):
     return redirect('accounts:login')
 
 
-class UsuarioListView(LoginRequiredMixin, ListView):
+class UsuarioListView(RolRestringidoMixin, ListView):
     model = CustomUser
     template_name = 'accounts/list.html'
     context_object_name = 'usuarios'
@@ -41,7 +42,7 @@ class UsuarioListView(LoginRequiredMixin, ListView):
         return qs
 
 
-class UsuarioCreateView(LoginRequiredMixin, CreateView):
+class UsuarioCreateView(RolRestringidoMixin, CreateView):
     model = CustomUser
     form_class = CustomUserCreationForm
     template_name = 'accounts/form.html'
@@ -57,7 +58,7 @@ class UsuarioCreateView(LoginRequiredMixin, CreateView):
         return ctx
 
 
-class UsuarioUpdateView(LoginRequiredMixin, UpdateView):
+class UsuarioUpdateView(RolRestringidoMixin, UpdateView):
     model = CustomUser
     form_class = CustomUserUpdateForm
     template_name = 'accounts/form.html'
@@ -73,7 +74,7 @@ class UsuarioUpdateView(LoginRequiredMixin, UpdateView):
         return ctx
 
 
-class UsuarioDeleteView(LoginRequiredMixin, DeleteView):
+class UsuarioDeleteView(RolRestringidoMixin, DeleteView):
     model = CustomUser
     template_name = 'accounts/confirm_delete.html'
     success_url = reverse_lazy('accounts:list')
@@ -87,3 +88,15 @@ class UsuarioDetailView(LoginRequiredMixin, DetailView):
     model = CustomUser
     template_name = 'accounts/detail.html'
     context_object_name = 'usuario'
+
+
+@login_required
+def cambiar_password_view(request):
+    form = PasswordCambioForm(user=request.user, data=request.POST or None)
+    if request.method == 'POST' and form.is_valid():
+        form.save()
+        from django.contrib.auth import update_session_auth_hash
+        update_session_auth_hash(request, form.user)
+        messages.success(request, 'Contraseña actualizada correctamente.')
+        return redirect('accounts:detail', pk=request.user.pk)
+    return render(request, 'accounts/cambiar_password.html', {'form': form})

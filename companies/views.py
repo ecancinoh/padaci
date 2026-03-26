@@ -2,11 +2,12 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib import messages
 from django.views.generic import ListView, CreateView, UpdateView, DeleteView, DetailView
 from django.urls import reverse_lazy
+from accounts.mixins import RolRestringidoMixin
 from .models import Empresa
 from .forms import EmpresaForm
 
 
-class EmpresaListView(LoginRequiredMixin, ListView):
+class EmpresaListView(RolRestringidoMixin, ListView):
     model = Empresa
     template_name = 'companies/list.html'
     context_object_name = 'empresas'
@@ -20,7 +21,7 @@ class EmpresaListView(LoginRequiredMixin, ListView):
         return qs
 
 
-class EmpresaCreateView(LoginRequiredMixin, CreateView):
+class EmpresaCreateView(RolRestringidoMixin, CreateView):
     model = Empresa
     form_class = EmpresaForm
     template_name = 'companies/form.html'
@@ -36,7 +37,7 @@ class EmpresaCreateView(LoginRequiredMixin, CreateView):
         return ctx
 
 
-class EmpresaUpdateView(LoginRequiredMixin, UpdateView):
+class EmpresaUpdateView(RolRestringidoMixin, UpdateView):
     model = Empresa
     form_class = EmpresaForm
     template_name = 'companies/form.html'
@@ -52,7 +53,7 @@ class EmpresaUpdateView(LoginRequiredMixin, UpdateView):
         return ctx
 
 
-class EmpresaDeleteView(LoginRequiredMixin, DeleteView):
+class EmpresaDeleteView(RolRestringidoMixin, DeleteView):
     model = Empresa
     template_name = 'companies/confirm_delete.html'
     success_url = reverse_lazy('companies:list')
@@ -62,7 +63,7 @@ class EmpresaDeleteView(LoginRequiredMixin, DeleteView):
         return super().form_valid(form)
 
 
-class EmpresaDetailView(LoginRequiredMixin, DetailView):
+class EmpresaDetailView(RolRestringidoMixin, DetailView):
     model = Empresa
     template_name = 'companies/detail.html'
     context_object_name = 'empresa'
