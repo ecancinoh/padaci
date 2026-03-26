@@ -125,6 +125,11 @@
       </div>
     </div>
     <div class="card-body p-0">
+      <datalist id="nombre-cliente-list">
+        {% for nombre_cliente in clientes_ruta_sugeridos %}
+          <option value="{{ nombre_cliente }}"></option>
+        {% endfor %}
+      </datalist>
       {{ formset_a.management_form }}
       <table class="table table-bordered table-sm mb-0">
         <thead class="thead-light"><tr><th>N° factura</th><th>Nombre cliente</th><th>Monto</th><th>Banco</th><th>Quitar</th></tr></thead>

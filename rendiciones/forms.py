@@ -197,7 +197,7 @@ class RendicionRepartoForm(forms.ModelForm):
 
 
 class CreditoDocumentoItemForm(forms.ModelForm):
-    nombre_cliente = forms.ChoiceField(choices=[], required=False, label='Nombre cliente')
+    nombre_cliente = forms.CharField(required=False, label='Nombre cliente')
     banco = forms.ChoiceField(choices=[], required=False, label='Banco')
 
     class Meta:
@@ -207,11 +207,10 @@ class CreditoDocumentoItemForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         cliente_choices = kwargs.pop('cliente_choices', [])
         super().__init__(*args, **kwargs)
-        current_value = self.instance.nombre_cliente if self.instance and self.instance.pk else None
-        choices = [('', '---------')] + list(cliente_choices)
-        if current_value and current_value not in [c[0] for c in choices]:
-            choices.append((current_value, current_value))
-        self.fields['nombre_cliente'].choices = choices
+        self.fields['nombre_cliente'].widget = forms.TextInput(attrs={
+            'list': 'nombre-cliente-list',
+            'placeholder': 'Escribe o selecciona un cliente de la ruta',
+        })
 
         banco_value = self.instance.banco if self.instance and self.instance.pk else None
         banco_choices = [('', '---------')] + list(CHILE_BANK_CHOICES)
