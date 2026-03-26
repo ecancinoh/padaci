@@ -103,6 +103,7 @@ class EntregaPago(models.Model):
         ('cheque', 'Cheque'),
         ('credito', 'Credito'),
         ('transferencia', 'Transferencia'),
+        ('descuento', 'Descuento'),
     ]
 
     entrega = models.ForeignKey(

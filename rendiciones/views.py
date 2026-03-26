@@ -81,6 +81,18 @@ def _build_autocompletado_desde_ruta(ruta):
                     seen['a'].add(key)
                 continue
 
+            if pago.metodo == 'descuento':
+                motivo = (pago.observacion or 'Descuento en pago')[:200]
+                key = (numero_ref, motivo, monto)
+                if key not in seen['b']:
+                    sugeridos['b'].append({
+                        'numero_factura': numero_ref,
+                        'motivo': motivo,
+                        'monto': monto,
+                    })
+                    seen['b'].add(key)
+                continue
+
             if pago.metodo == 'credito':
                 key = (numero_ref, cliente.nombre, monto)
                 if key not in seen['c']:
@@ -108,9 +120,10 @@ def _build_autocompletado_desde_ruta(ruta):
 
 def _autocompletar_rendicion_desde_entregas(rendicion):
     """
-    Regenera idempotentemente lineas A/C/E/D desde los pagos registrados por entrega en la ruta.
+    Regenera idempotentemente lineas A/B/C/E/D desde los pagos registrados por entrega en la ruta.
     Reglas de mapeo:
     - A: pago con metodo=cheque
+    - B: pago con metodo=descuento
     - C: pago con metodo=credito
     - E: pago con metodo=transferencia
     - D: entrega con estado in {fallido, devuelto}
@@ -136,6 +149,13 @@ def _autocompletar_rendicion_desde_entregas(rendicion):
             monto=monto,
         ).exists()
 
+    def _existe_devolucion_parcial(numero_factura, motivo, monto):
+        return rendicion.devoluciones_parciales.filter(
+            numero_factura=numero_factura,
+            motivo=motivo,
+            monto=monto,
+        ).exists()
+
     def _existe_deposito_transferencia(numero_factura, monto):
         return rendicion.depositos_transferencias.filter(
             numero_factura=numero_factura,
@@ -148,6 +168,10 @@ def _autocompletar_rendicion_desde_entregas(rendicion):
     for item in sugeridos['a']:
         if not _existe_credito_documento(item['numero_factura'], item['nombre_cliente'], item['monto']):
             rendicion.creditos_documentos.create(**item)
+
+    for item in sugeridos['b']:
+        if not _existe_devolucion_parcial(item['numero_factura'], item['motivo'], item['monto']):
+            rendicion.devoluciones_parciales.create(**item)
 
     for item in sugeridos['c']:
         if not _existe_credito_confianza(item['numero_factura'], item['autoriza_credito'], item['monto']):
