@@ -12,70 +12,105 @@
 {% endblock %}
 
 {% block content %}
+<style>
+  .kpi-card {
+    text-decoration: none;
+    color: inherit;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    display: block;
+    h-100: 100%;
+  }
+  .kpi-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.2) !important;
+  }
+  .kpi-card:hover .card-body {
+    background-color: rgba(0, 0, 0, 0.02);
+  }
+</style>
+
 <div class="row">
   <div class="col-xl-3 col-md-6 mb-4">
-    <div class="card border-left-info shadow h-100 py-2">
-      <div class="card-body">
-        <div class="row no-gutters align-items-center">
-          <div class="col mr-2">
-            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">Clientes Activos</div>
-            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_clientes }}</div>
+    <a href="{% url 'clients:list' %}" class="kpi-card">
+      <div class="card border-left-info shadow h-100 py-2">
+        <div class="card-body">
+          <div class="row no-gutters align-items-center">
+            <div class="col mr-2">
+              <div class="text-xs font-weight-bold text-info text-uppercase mb-1">Clientes Activos</div>
+              <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_clientes }}</div>
+            </div>
+            <div class="col-auto"><i class="fas fa-users fa-2x text-gray-300"></i></div>
           </div>
-          <div class="col-auto"><i class="fas fa-users fa-2x text-gray-300"></i></div>
         </div>
       </div>
-    </div>
+    </a>
   </div>
 
   <div class="col-xl-3 col-md-6 mb-4">
-    <div class="card border-left-primary shadow h-100 py-2">
-      <div class="card-body">
-        <div class="row no-gutters align-items-center">
-          <div class="col mr-2">
-            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Empresas Activas</div>
-            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_empresas }}</div>
+    <a href="{% url 'companies:list' %}" class="kpi-card">
+      <div class="card border-left-primary shadow h-100 py-2">
+        <div class="card-body">
+          <div class="row no-gutters align-items-center">
+            <div class="col mr-2">
+              <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Empresas Activas</div>
+              <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_empresas }}</div>
+            </div>
+            <div class="col-auto"><i class="fas fa-building fa-2x text-gray-300"></i></div>
           </div>
-          <div class="col-auto"><i class="fas fa-building fa-2x text-gray-300"></i></div>
         </div>
       </div>
-    </div>
+    </a>
   </div>
 
   <div class="col-xl-3 col-md-6 mb-4">
-    <div class="card border-left-success shadow h-100 py-2">
-      <div class="card-body">
-        <div class="row no-gutters align-items-center">
-          <div class="col mr-2">
-            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Conductores</div>
-            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_conductores }}</div>
+    <a href="{% url 'accounts:list' %}" class="kpi-card">
+      <div class="card border-left-success shadow h-100 py-2">
+        <div class="card-body">
+          <div class="row no-gutters align-items-center">
+            <div class="col mr-2">
+              <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Conductores</div>
+              <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_conductores }}</div>
+            </div>
+            <div class="col-auto"><i class="fas fa-id-card fa-2x text-gray-300"></i></div>
           </div>
-          <div class="col-auto"><i class="fas fa-id-card fa-2x text-gray-300"></i></div>
         </div>
       </div>
-    </div>
+    </a>
   </div>
 
   <div class="col-xl-3 col-md-6 mb-4">
-    <div class="card border-left-warning shadow h-100 py-2">
-      <div class="card-body">
-        <div class="row no-gutters align-items-center">
-          <div class="col mr-2">
-            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Ruta de Hoy</div>
-            {% if ruta_hoy %}
-              <div class="h5 mb-0 font-weight-bold text-gray-800">
-                <span class="badge badge-{% if ruta_hoy.estado == 'completada' %}success{% elif ruta_hoy.estado == 'en_curso' %}primary{% else %}warning{% endif %}">
-                  {{ ruta_hoy.get_estado_display }}
-                </span>
+    {% if ruta_hoy %}
+      <a href="{% url 'routes:detail' ruta_hoy.pk %}" class="kpi-card">
+        <div class="card border-left-warning shadow h-100 py-2">
+          <div class="card-body">
+            <div class="row no-gutters align-items-center">
+              <div class="col mr-2">
+                <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Ruta de Hoy</div>
+                <div class="h5 mb-0 font-weight-bold text-gray-800">
+                  <span class="badge badge-{% if ruta_hoy.estado == 'completada' %}success{% elif ruta_hoy.estado == 'en_curso' %}primary{% else %}warning{% endif %}">
+                    {{ ruta_hoy.get_estado_display }}
+                  </span>
+                </div>
+                <div class="text-xs text-muted mt-1">{{ ruta_hoy.conductor.get_full_name }}</div>
               </div>
-              <div class="text-xs text-muted mt-1">{{ ruta_hoy.conductor.get_full_name }}</div>
-            {% else %}
-              <div class="h6 mb-0 text-muted">Sin ruta</div>
-            {% endif %}
+              <div class="col-auto"><i class="fas fa-route fa-2x text-gray-300"></i></div>
+            </div>
           </div>
-          <div class="col-auto"><i class="fas fa-route fa-2x text-gray-300"></i></div>
+        </div>
+      </a>
+    {% else %}
+      <div class="card border-left-warning shadow h-100 py-2">
+        <div class="card-body">
+          <div class="row no-gutters align-items-center">
+            <div class="col mr-2">
+              <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Ruta de Hoy</div>
+              <div class="h6 mb-0 text-muted">Sin ruta</div>
+            </div>
+            <div class="col-auto"><i class="fas fa-route fa-2x text-gray-300"></i></div>
+          </div>
         </div>
       </div>
-    </div>
+    {% endif %}
   </div>
 </div>
 
