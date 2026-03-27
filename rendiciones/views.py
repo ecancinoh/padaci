@@ -498,8 +498,8 @@ def rendicion_update(request, pk):
             rendicion = form.save()
             for fs in formsets.values():
                 fs.save()
-            # Regenerar lineas de autocomplecion desde entregas (idempotente: no crea duplicados)
-            _autocompletar_rendicion_desde_entregas(rendicion)
+            # En update no se regenera desde ruta para preservar cambios manuales
+            # y evitar duplicados cuando se edita numero_factura.
             rendicion.recalcular_totales()
             rendicion.save(update_fields=['menos_items', 'total_dinero_recibir'])
             messages.success(request, 'Rendición actualizada correctamente.')
