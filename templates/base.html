@@ -52,7 +52,7 @@
       <div class="sidebar-heading">Administración</div>
 
       <!-- Usuarios -->
-      {% if user.rol != 'conductor' and user.rol != 'peoneta' %}
+      {% if user.rol != 'conductor' and user.rol != 'peoneta' and user.rol != 'supervisor' %}
       <li class="nav-item {% block active_accounts %}{% endblock %}">
         {% url 'accounts:list' as url_accounts_list %}
         <a class="nav-link" href="{{ url_accounts_list|default:'#' }}">
@@ -63,7 +63,7 @@
       {% endif %}
 
       <!-- Empresas -->
-      {% if user.rol != 'conductor' and user.rol != 'peoneta' %}
+      {% if user.rol != 'conductor' and user.rol != 'peoneta' and user.rol != 'supervisor' %}
       <li class="nav-item {% block active_companies %}{% endblock %}">
         {% url 'companies:list' as url_companies_list %}
         <a class="nav-link" href="{{ url_companies_list|default:'#' }}">
@@ -113,7 +113,7 @@
       </li>
 
       <!-- Historial -->
-      {% if user.rol != 'conductor' and user.rol != 'peoneta' %}
+      {% if user.rol != 'conductor' and user.rol != 'peoneta' and user.rol != 'supervisor' %}
       <li class="nav-item {% block active_history %}{% endblock %}">
         {% url 'history:list' as url_history_list %}
         <a class="nav-link" href="{{ url_history_list|default:'#' }}">

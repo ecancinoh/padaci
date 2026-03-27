@@ -1,5 +1,6 @@
 import traceback
 from pathlib import Path
+from django.contrib import messages
 from django.db.utils import OperationalError, ProgrammingError
 from django.http import HttpResponseRedirect
 
@@ -59,3 +60,54 @@ class ExceptionFileLoggingMiddleware:
                 break
             except Exception:
                 continue
+
+
+class RoleAccessMiddleware:
+    """Role-based restrictions for supervisor users."""
+
+    READONLY_BLOCKED_METHODS = {'POST', 'PUT', 'PATCH', 'DELETE'}
+    MUTATION_GET_TOKENS = ('/nuevo/', '/nueva/', '/editar/', '/eliminar/', '/generar/')
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        user = getattr(request, 'user', None)
+        if not user or not user.is_authenticated or getattr(user, 'rol', None) != 'supervisor':
+            return self.get_response(request)
+
+        path = request.path or '/'
+        method = (request.method or 'GET').upper()
+
+        if method in self.READONLY_BLOCKED_METHODS:
+            return self._deny(request, 'Tu perfil supervisor tiene acceso solo de lectura.')
+
+        if method == 'GET' and any(token in path for token in self.MUTATION_GET_TOKENS):
+            return self._deny(request, 'No tienes permisos para acciones de creacion o edicion.')
+
+        if path.startswith('/empresas/'):
+            return self._deny(request, 'No tienes permisos para acceder a la seccion Empresas.')
+
+        if path.startswith('/historial/'):
+            return self._deny(request, 'No tienes permisos para acceder a la seccion Historial.')
+
+        if path.startswith('/accounts/') and not self._is_allowed_accounts_path(path, user.pk):
+            return self._deny(request, 'No tienes permisos para acceder a la seccion Usuarios.')
+
+        return self.get_response(request)
+
+    def _is_allowed_accounts_path(self, path: str, user_pk: int) -> bool:
+        own_profile_slash = f'/accounts/{user_pk}/'
+        own_profile_no_slash = f'/accounts/{user_pk}'
+        allowed_paths = {
+            '/accounts/login/',
+            '/accounts/logout/',
+            '/accounts/perfil/cambiar-password/',
+            own_profile_slash,
+            own_profile_no_slash,
+        }
+        return path in allowed_paths
+
+    def _deny(self, request, message_text: str):
+        messages.error(request, message_text)
+        return HttpResponseRedirect('/dashboard/')
