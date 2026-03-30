@@ -12,10 +12,15 @@
       <div class="card-header bg-danger text-white"><h6 class="m-0 font-weight-bold">¿Estás seguro?</h6></div>
       <div class="card-body text-center">
         <p class="lead">Esta acción no se puede deshacer.</p>
-        <form method="post">{% csrf_token %}
-          <button type="submit" class="btn btn-danger mr-2"><i class="fas fa-trash mr-1"></i> Sí, eliminar</button>
-          <a href="javascript:history.back()" class="btn btn-secondary">Cancelar</a>
-        </form>
+        {% if user.rol != 'conductor' and user.rol != 'peoneta' %}
+          <form method="post">{% csrf_token %}
+            <button type="submit" class="btn btn-danger mr-2"><i class="fas fa-trash mr-1"></i> Sí, eliminar</button>
+            <a href="javascript:history.back()" class="btn btn-secondary">Cancelar</a>
+          </form>
+        {% else %}
+          <div class="alert alert-warning">No tienes permisos para eliminar clientes.</div>
+          <a href="javascript:history.back()" class="btn btn-secondary">Volver</a>
+        {% endif %}
       </div>
     </div>
   </div>

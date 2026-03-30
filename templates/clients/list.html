@@ -46,7 +46,9 @@
             <td>
               <a href="{% url 'clients:detail' c.pk %}" class="btn btn-info btn-sm"><i class="fas fa-eye"></i></a>
               <a href="{% url 'clients:update' c.pk %}" class="btn btn-warning btn-sm"><i class="fas fa-edit"></i></a>
-              <a href="{% url 'clients:delete' c.pk %}" class="btn btn-danger btn-sm"><i class="fas fa-trash"></i></a>
+              {% if user.rol != 'conductor' and user.rol != 'peoneta' %}
+                <a href="{% url 'clients:delete' c.pk %}" class="btn btn-danger btn-sm"><i class="fas fa-trash"></i></a>
+              {% endif %}
             </td>
           </tr>
           {% empty %}

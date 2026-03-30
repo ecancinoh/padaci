@@ -1,3 +1,11 @@
+Mi nombre es Emanuel.
+
+Cuando te pido iniciar el servidor, debes iniciar todo lo necesario para poder ingresar a la app desde el navegador web.
+
+## GITHUB
+
+Cuando te pida subir a github para luego subir a mi hosting, recuerdo que mi hosting no es VPS, por lo tanto, para hacer las migraciones tengo que activar un cron que ya tengo hecho en mi hosting.
+
 # PADACI – Sistema de Logística de Entrega de Paquetería
 
 Sistema web de gestión logística para el control y seguimiento de entregas de paquetería con módulo de optimización de rutas asistido por Inteligencia Artificial.

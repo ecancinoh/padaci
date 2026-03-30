@@ -62,14 +62,53 @@ class ClienteUpdateView(LoginRequiredMixin, UpdateView):
         return ctx
 
 
-class ClienteDeleteView(LoginRequiredMixin, DeleteView):
+
+from accounts.mixins import RolRestringidoMixin
+
+
+from routes.models import ParadaRuta, Entrega, RutaDia
+from django.db import transaction
+
+class ClienteDeleteView(RolRestringidoMixin, LoginRequiredMixin, DeleteView):
     model = Cliente
     template_name = 'clients/confirm_delete.html'
     success_url = reverse_lazy('clients:list')
 
     def form_valid(self, form):
-        messages.success(self.request, 'Cliente eliminado.')
-        return super().form_valid(form)
+        cliente = self.object
+        entregas = Entrega.objects.filter(cliente=cliente)
+        # Buscar todas las entregas del cliente que tengan al menos una parada en una ruta planificada
+        entregas_con_parada_planificada = entregas.filter(
+            paradas__ruta__estado='planificada'
+        ).distinct()
+        # IDs de esas entregas
+        entregas_ids = list(entregas_con_parada_planificada.values_list('id', flat=True))
+        # Todas las paradas de esas entregas en rutas planificadas
+        paradas_planificadas = ParadaRuta.objects.filter(
+            entrega_id__in=entregas_ids,
+            ruta__estado='planificada'
+        )
+        paradas_ids = list(paradas_planificadas.values_list('id', flat=True))
+
+        with transaction.atomic():
+            # Eliminar paradas y entregas asociadas a rutas planificadas usando listas de IDs
+            if paradas_ids:
+                ParadaRuta.objects.filter(id__in=paradas_ids).delete()
+            if entregas_ids:
+                Entrega.objects.filter(id__in=entregas_ids).delete()
+
+            # Verificar si quedan entregas asociadas al cliente
+            entregas_restantes = Entrega.objects.filter(cliente=cliente)
+            if entregas_restantes.exists():
+                detalles = '\n'.join([str(e) for e in entregas_restantes])
+                messages.error(self.request, f'No se puede eliminar el cliente porque tiene entregas asociadas en rutas que no están en estado Planificada o sin ruta.\nEntregas que lo impiden:\n{detalles}')
+                transaction.set_rollback(True)
+                return self.form_invalid(form)
+
+            # Ahora eliminar el cliente
+            response = super().form_valid(form)
+        messages.success(self.request, 'Cliente y entregas asociadas en rutas planificadas eliminados correctamente.')
+        return response
 
 
 class ClienteDetailView(LoginRequiredMixin, DetailView):
