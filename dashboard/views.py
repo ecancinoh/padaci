@@ -44,6 +44,7 @@ def index(request):
         hoy = timezone.localdate()
 
         total_clientes = Cliente.objects.filter(activo=True).count()
+        total_clientes_sin_coordenadas = Cliente.objects.filter(activo=True).filter(latitud__isnull=True).count() + Cliente.objects.filter(activo=True).filter(longitud__isnull=True).exclude(latitud__isnull=True).count()
         total_empresas = Empresa.objects.filter(activa=True).count()
         total_conductores = CustomUser.objects.filter(rol='conductor', activo=True).count()
 
@@ -66,6 +67,7 @@ def index(request):
             'total_empresas': total_empresas,
             'total_conductores': total_conductores,
             'ruta_hoy': ruta_hoy,
+            'total_clientes_sin_coordenadas': total_clientes_sin_coordenadas,
         }
         return render(request, 'dashboard/index.html', ctx)
     except Exception:

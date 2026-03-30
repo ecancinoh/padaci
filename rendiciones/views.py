@@ -135,9 +135,9 @@ def _autocompletar_rendicion_desde_entregas(rendicion):
     """
     sugeridos, _ = _build_autocompletado_desde_ruta(rendicion.ruta)
 
-    def _existe_credito_documento(numero_factura, nombre_cliente, monto):
+    def _existe_credito_documento(nombre_cliente, monto):
+        # Si ya existe una línea para ese cliente y monto, no sugerir otra (sin importar el número de factura)
         return rendicion.creditos_documentos.filter(
-            numero_factura=numero_factura,
             nombre_cliente=nombre_cliente,
             monto=monto,
         ).exists()
@@ -166,7 +166,7 @@ def _autocompletar_rendicion_desde_entregas(rendicion):
         return rendicion.facturas_nulas_detalle.filter(numero_factura=numero_factura).exists()
 
     for item in sugeridos['a']:
-        if not _existe_credito_documento(item['numero_factura'], item['nombre_cliente'], item['monto']):
+        if not _existe_credito_documento(item['nombre_cliente'], item['monto']):
             rendicion.creditos_documentos.create(**item)
 
     for item in sugeridos['b']:

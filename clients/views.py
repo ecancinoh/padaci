@@ -16,10 +16,13 @@ class ClienteListView(LoginRequiredMixin, ListView):
         qs = super().get_queryset()
         q = self.request.GET.get('q', '')
         empresa = self.request.GET.get('empresa', '')
+        sin_coordenadas = self.request.GET.get('sin_coordenadas')
         if q:
             qs = qs.filter(nombre__icontains=q) | qs.filter(comuna__icontains=q)
         if empresa:
             qs = qs.filter(empresa_id=empresa)
+        if sin_coordenadas:
+            qs = qs.filter(activo=True).filter(latitud__isnull=True) | qs.filter(activo=True).filter(longitud__isnull=True).exclude(latitud__isnull=True)
         return qs
 
 
