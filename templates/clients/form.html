@@ -36,6 +36,15 @@
             {% if form.comuna.errors %}<div class="text-danger small mt-1">{{ form.comuna.errors }}</div>{% endif %}
           </div>
 
+          <!-- Dirección -->
+          <div class="form-group">
+            <label for="{{ form.direccion.id_for_label }}" class="font-weight-bold">
+              <i class="fas fa-home mr-1 text-primary"></i> Dirección
+            </label>
+            {{ form.direccion }}
+            {% if form.direccion.errors %}<div class="text-danger small mt-1">{{ form.direccion.errors }}</div>{% endif %}
+          </div>
+
           <!-- Coordenadas -->
           <div class="row">
             <div class="col-md-6">

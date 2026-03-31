@@ -59,6 +59,7 @@ for route, module, namespace in [
     ("planificacion/", "planner.urls", "planner"),
     ("rutas/", "routes.urls", "routes"),
     ("rendiciones/", "rendiciones.urls", "rendiciones"),
+    ("optimizador/", "delivery_optimizer.urls", "delivery_optimizer"),
 ]:
     included = _safe_include(route, module, namespace)
     if included is not None:

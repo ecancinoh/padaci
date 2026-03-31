@@ -72,6 +72,7 @@ LOCAL_APPS = [
     'routes',
     'rendiciones',
     'dashboard',
+    'delivery_optimizer',
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY + LOCAL_APPS

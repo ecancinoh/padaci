@@ -24,7 +24,7 @@
       <table class="table table-bordered table-hover table-sm">
         <thead class="thead-light">
           <tr>
-            <th>Nombre del Cliente</th><th>Comuna</th><th>Tiempo Atención</th><th>Latitud</th><th>Longitud</th><th>Navegación</th><th>Acciones</th>
+            <th>Nombre del Cliente</th><th>Comuna</th><th>Dirección</th><th>Tiempo Atención</th><th>Latitud</th><th>Longitud</th><th>Navegación</th><th>Acciones</th>
           </tr>
         </thead>
         <tbody>
@@ -32,6 +32,7 @@
           <tr>
             <td><strong>{{ c.nombre }}</strong></td>
             <td>{{ c.comuna|default:"–" }}</td>
+            <td>{{ c.direccion|default:"–" }}</td>
             <td><span class="badge badge-secondary">{{ c.tiempo_estimado_atencion }} min</span></td>
             <td><code>{{ c.latitud|default:"–" }}</code></td>
             <td><code>{{ c.longitud|default:"–" }}</code></td>
