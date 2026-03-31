@@ -65,11 +65,7 @@ class EntregaForm(forms.ModelForm):
 class EntregaEstadoForm(forms.ModelForm):
     class Meta:
         model = Entrega
-        fields = ['estado', 'estado_pago', 'observacion', 'foto_evidencia', 'fecha_entrega']
-        widgets = {
-            'fecha_entrega': forms.DateTimeInput(attrs={'type': 'datetime-local'}),
-            'observacion': forms.Textarea(attrs={'rows': 2}),
-        }
+        fields = ['estado', 'estado_pago', 'foto_evidencia']
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

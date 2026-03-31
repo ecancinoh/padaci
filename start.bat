@@ -5,7 +5,7 @@ echo ================================================
 echo.
 
 REM Activar entorno virtual
-call venv\Scripts\activate.bat
+call .venv\Scripts\activate.bat
 
 REM Verificar si MySQL está disponible aplicando migraciones
 echo [1/3] Aplicando migraciones...

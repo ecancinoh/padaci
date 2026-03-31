@@ -45,9 +45,10 @@ COMUNAS_VI_REGION = [
 class ClienteForm(forms.ModelForm):
     class Meta:
         model = Cliente
-        fields = ['nombre', 'comuna', 'latitud', 'longitud', 'tiempo_estimado_atencion', 'observaciones']
+        fields = ['nombre', 'comuna', 'direccion', 'latitud', 'longitud', 'tiempo_estimado_atencion', 'observaciones']
         widgets = {
             'comuna': forms.Select(choices=COMUNAS_VI_REGION),
+            'direccion': forms.Textarea(attrs={'rows': 2, 'placeholder': 'Ej: Av. Siempre Viva 1234, depto 5B'}),
             'latitud': forms.NumberInput(attrs={'step': 'any', 'placeholder': 'Ej: -33.456789'}),
             'longitud': forms.NumberInput(attrs={'step': 'any', 'placeholder': 'Ej: -70.654321'}),
             'tiempo_estimado_atencion': forms.NumberInput(attrs={'min': 1, 'placeholder': 'Minutos', 'value': 10}),
@@ -57,6 +58,7 @@ class ClienteForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['comuna'].required = False
+        self.fields['direccion'].required = False
         for name, field in self.fields.items():
             field.widget.attrs.update({'class': 'form-control'})
         self.fields['nombre'].widget.attrs['placeholder'] = 'Ej: Juan Pérez'
