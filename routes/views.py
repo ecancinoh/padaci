@@ -603,6 +603,7 @@ def crear_entregas_desde_ruta(request, pk):
             paradas_guardadas.append({
                 'orden': i,
                 'entrega_id': eid,
+                'cliente_id': c.pk,
                 'cliente': c.nombre,
                 'comuna': c.comuna,
                 'observaciones': c.observaciones or '',
@@ -668,6 +669,7 @@ def optimizar_ruta(request, pk):
         paradas_guardadas.append({
             'orden': i,
             'entrega_id': eid,
+            'cliente_id': c.pk,
             'cliente': c.nombre,
             'comuna': c.comuna or '–',
             'observaciones': c.observaciones or '',
@@ -770,6 +772,7 @@ def reoptimizar_desde_posicion(request, pk):
             nueva_lista.append({
                 'orden': orden,
                 'entrega_id': eid,
+                'cliente_id': c.pk,
                 'cliente': c.nombre,
                 'comuna': c.comuna or '–',
                 'observaciones': c.observaciones or '',
@@ -803,6 +806,7 @@ def reoptimizar_desde_posicion(request, pk):
             nueva_lista.append({
                 'orden': orden,
                 'entrega_id': p_data['id'],
+                'cliente_id': c.pk,
                 'cliente': c.nombre,
                 'comuna': c.comuna or '–',
                 'observaciones': c.observaciones or '',

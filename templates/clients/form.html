@@ -5,7 +5,7 @@
 {% block page_heading %}
 <div class="d-sm-flex align-items-center justify-content-between mb-4">
   <h1 class="h3 mb-0 text-gray-800"><i class="fas fa-user-plus mr-2 text-primary"></i>{{ titulo }}</h1>
-  <a href="{% url 'clients:list' %}" class="btn btn-secondary btn-sm"><i class="fas fa-arrow-left mr-1"></i> Volver</a>
+  <a href="{% if next_url %}{{ next_url }}{% else %}{% url 'clients:list' %}{% endif %}" class="btn btn-secondary btn-sm"><i class="fas fa-arrow-left mr-1"></i> Volver</a>
 </div>
 {% endblock %}
 
@@ -17,6 +17,9 @@
       <div class="card-body">
         <form method="post">
           {% csrf_token %}
+          {% if next_url %}
+          <input type="hidden" name="next" value="{{ next_url }}">
+          {% endif %}
 
           <!-- Nombre del Cliente -->
           <div class="form-group">
@@ -138,7 +141,7 @@
 
           <hr>
           <button type="submit" class="btn btn-primary"><i class="fas fa-save mr-1"></i> Guardar</button>
-          <a href="{% url 'clients:list' %}" class="btn btn-secondary ml-2">Cancelar</a>
+          <a href="{% if next_url %}{{ next_url }}{% else %}{% url 'clients:list' %}{% endif %}" class="btn btn-secondary ml-2">Cancelar</a>
         </form>
       </div>
     </div>

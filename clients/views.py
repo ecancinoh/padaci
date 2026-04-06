@@ -2,6 +2,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib import messages
 from django.views.generic import ListView, CreateView, UpdateView, DeleteView, DetailView
 from django.urls import reverse_lazy
+from django.utils.http import url_has_allowed_host_and_scheme
 from .models import Cliente
 from .forms import ClienteForm
 
@@ -55,13 +56,27 @@ class ClienteUpdateView(LoginRequiredMixin, UpdateView):
     template_name = 'clients/form.html'
     success_url = reverse_lazy('clients:list')
 
+    def _get_next_url(self):
+        next_url = self.request.POST.get('next') or self.request.GET.get('next')
+        if next_url and url_has_allowed_host_and_scheme(
+            url=next_url,
+            allowed_hosts={self.request.get_host()},
+            require_https=self.request.is_secure(),
+        ):
+            return next_url
+        return None
+
     def form_valid(self, form):
         messages.success(self.request, 'Cliente actualizado correctamente.')
         return super().form_valid(form)
 
+    def get_success_url(self):
+        return self._get_next_url() or super().get_success_url()
+
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         ctx['titulo'] = 'Editar Cliente'
+        ctx['next_url'] = self._get_next_url()
         return ctx
 
 
