@@ -20,11 +20,16 @@ if %errorlevel% neq 0 (
 REM Crear superusuario si no existe
 echo.
 echo [2/3] Verificando superusuario...
-python -c "from accounts.models import CustomUser; CustomUser.objects.filter(is_superuser=True).exists() or CustomUser.objects.create_superuser('admin','admin@padaci.cl','admin123', first_name='Administrador', rol='admin')"
+python manage.py shell -c "from accounts.models import CustomUser; CustomUser.objects.filter(is_superuser=True).exists() or CustomUser.objects.create_superuser('admin','admin@padaci.cl','admin123', first_name='Administrador', rol='admin')"
+if %errorlevel% neq 0 (
+    echo ERROR: No se pudo verificar o crear el superusuario.
+    pause
+    exit /b 1
+)
 
 REM Iniciar servidor
 echo.
 echo [3/3] Iniciando servidor en http://127.0.0.1:8000
-echo       Usuario: admin  |  Contraseña: admin123
+echo       Usuario: admin  ^|  Contraseña: admin123
 echo.
 python manage.py runserver
