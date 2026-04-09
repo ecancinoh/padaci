@@ -459,7 +459,6 @@ def rendicion_create(request):
             for fs in formsets.values():
                 fs.instance = rendicion
                 fs.save()
-            _autocompletar_rendicion_desde_entregas(rendicion)
             rendicion.recalcular_totales()
             rendicion.save(update_fields=['menos_items', 'total_dinero_recibir'])
             messages.success(request, 'Rendición creada correctamente.')
