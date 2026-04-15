@@ -143,3 +143,105 @@ class RendicionCreateTests(TestCase):
 		self.assertEqual(rendicion.depositos_transferencias.get().numero_factura, 'E-MANUAL-001')
 		self.assertEqual(rendicion.menos_items, Decimal('11000'))
 		self.assertEqual(rendicion.total_dinero_recibir, Decimal('89000'))
+
+	def test_create_autocompletes_nula_payment_into_facturas_nulas(self):
+		entrega = self._crear_entrega(1, metodo_pago='nula', monto='4500')
+
+		response = self.client.post(
+			reverse('rendiciones:create'),
+			data={
+				'ruta': str(self.ruta.pk),
+				'fecha': '2026-04-09',
+				'distribuidora': str(self.empresa.pk),
+				'nombre_repartidor': str(self.conductor.pk),
+				'nombre_peoneta': '',
+				'estacionamientos': '0',
+				'diferencia_menos': '0',
+				'diferencia_mas': '0',
+				'facturas_totales': '1',
+				'facturas_entregadas': '1',
+				'facturas_nulas': '1',
+				'kilometraje_inicial': '0',
+				'kilometraje_final': '10',
+				'total_kilometros_recorridos': '10',
+				'a-TOTAL_FORMS': '0',
+				'a-INITIAL_FORMS': '0',
+				'a-MIN_NUM_FORMS': '0',
+				'a-MAX_NUM_FORMS': '1000',
+				'b-TOTAL_FORMS': '0',
+				'b-INITIAL_FORMS': '0',
+				'b-MIN_NUM_FORMS': '0',
+				'b-MAX_NUM_FORMS': '1000',
+				'c-TOTAL_FORMS': '0',
+				'c-INITIAL_FORMS': '0',
+				'c-MIN_NUM_FORMS': '0',
+				'c-MAX_NUM_FORMS': '1000',
+				'd-TOTAL_FORMS': '0',
+				'd-INITIAL_FORMS': '0',
+				'd-MIN_NUM_FORMS': '0',
+				'd-MAX_NUM_FORMS': '1000',
+				'e-TOTAL_FORMS': '0',
+				'e-INITIAL_FORMS': '0',
+				'e-MIN_NUM_FORMS': '0',
+				'e-MAX_NUM_FORMS': '1000',
+			},
+		)
+
+		self.assertEqual(response.status_code, 302)
+
+		rendicion = RendicionReparto.objects.get(ruta=self.ruta)
+		self.assertEqual(rendicion.facturas_nulas_detalle.count(), 1)
+		item = rendicion.facturas_nulas_detalle.get()
+		self.assertEqual(item.numero_factura, str(entrega.pk))
+		self.assertEqual(item.monto, Decimal('4500'))
+
+	def test_create_avoids_duplicate_factura_nula_when_delivery_is_fallido(self):
+		entrega = self._crear_entrega(1, estado='fallido', metodo_pago='nula', monto='3500')
+
+		response = self.client.post(
+			reverse('rendiciones:create'),
+			data={
+				'ruta': str(self.ruta.pk),
+				'fecha': '2026-04-09',
+				'distribuidora': str(self.empresa.pk),
+				'nombre_repartidor': str(self.conductor.pk),
+				'nombre_peoneta': '',
+				'estacionamientos': '0',
+				'diferencia_menos': '0',
+				'diferencia_mas': '0',
+				'facturas_totales': '1',
+				'facturas_entregadas': '0',
+				'facturas_nulas': '1',
+				'kilometraje_inicial': '0',
+				'kilometraje_final': '10',
+				'total_kilometros_recorridos': '10',
+				'a-TOTAL_FORMS': '0',
+				'a-INITIAL_FORMS': '0',
+				'a-MIN_NUM_FORMS': '0',
+				'a-MAX_NUM_FORMS': '1000',
+				'b-TOTAL_FORMS': '0',
+				'b-INITIAL_FORMS': '0',
+				'b-MIN_NUM_FORMS': '0',
+				'b-MAX_NUM_FORMS': '1000',
+				'c-TOTAL_FORMS': '0',
+				'c-INITIAL_FORMS': '0',
+				'c-MIN_NUM_FORMS': '0',
+				'c-MAX_NUM_FORMS': '1000',
+				'd-TOTAL_FORMS': '0',
+				'd-INITIAL_FORMS': '0',
+				'd-MIN_NUM_FORMS': '0',
+				'd-MAX_NUM_FORMS': '1000',
+				'e-TOTAL_FORMS': '0',
+				'e-INITIAL_FORMS': '0',
+				'e-MIN_NUM_FORMS': '0',
+				'e-MAX_NUM_FORMS': '1000',
+			},
+		)
+
+		self.assertEqual(response.status_code, 302)
+
+		rendicion = RendicionReparto.objects.get(ruta=self.ruta)
+		self.assertEqual(rendicion.facturas_nulas_detalle.count(), 1)
+		item = rendicion.facturas_nulas_detalle.get()
+		self.assertEqual(item.numero_factura, str(entrega.pk))
+		self.assertEqual(item.monto, Decimal('3500'))

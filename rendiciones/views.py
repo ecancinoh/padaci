@@ -53,8 +53,10 @@ def _build_autocompletado_desde_ruta(ruta):
         cliente = entrega.cliente
         numero_ref = str(entrega.pk)
         resumen['entregas'] += 1
+        pagos = list(entrega.pagos.all())
+        tiene_pago_nula = any(pago.metodo == 'nula' for pago in pagos)
 
-        if entrega.estado in {'fallido', 'devuelto'}:
+        if entrega.estado in {'fallido', 'devuelto'} and not tiene_pago_nula:
             key = (numero_ref, Decimal('0'))
             if key not in seen['d']:
                 sugeridos['d'].append({
@@ -63,9 +65,20 @@ def _build_autocompletado_desde_ruta(ruta):
                 })
                 seen['d'].add(key)
 
-        for pago in entrega.pagos.all():
+        for pago in pagos:
             resumen['pagos'] += 1
             monto = pago.monto or Decimal('0')
+
+            if pago.metodo == 'nula':
+                key = (numero_ref, monto)
+                if key not in seen['d']:
+                    sugeridos['d'].append({
+                        'numero_factura': numero_ref,
+                        'monto': monto,
+                    })
+                    seen['d'].add(key)
+                continue
+
             if monto <= 0:
                 continue
 
@@ -126,7 +139,7 @@ def _autocompletar_rendicion_desde_entregas(rendicion):
     - B: pago con metodo=descuento
     - C: pago con metodo=credito
     - E: pago con metodo=transferencia
-    - D: entrega con estado in {fallido, devuelto}
+    - D: entrega con estado in {fallido, devuelto} o pago con metodo=nula
     
     Notas de idempotencia:
     - No borra items existentes (permite preservar ediciones manuales)

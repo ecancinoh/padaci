@@ -104,6 +104,7 @@ class EntregaPago(models.Model):
         ('credito', 'Credito'),
         ('transferencia', 'Transferencia'),
         ('descuento', 'Descuento'),
+        ('nula', 'Nula'),
     ]
 
     entrega = models.ForeignKey(
