@@ -278,7 +278,7 @@ var routeMarkers = [], polyline = null;
 
 {% if paradas %}
 var paradasIniciales = [{% for p in paradas %}{% if p.entrega.cliente.tiene_coordenadas %}
-  {lat:{{ p.entrega.cliente.latitud|unlocalize }},lon:{{ p.entrega.cliente.longitud|unlocalize }},orden:{{ p.orden }},nombre:"{{ p.entrega.cliente.nombre|escapejs }}",observaciones:"{{ p.entrega.cliente.observaciones|escapejs }}"},{% endif %}{% endfor %}];
+  {lat:{{ p.entrega.cliente.latitud|unlocalize }},lon:{{ p.entrega.cliente.longitud|unlocalize }},orden:{{ p.orden }},nombre:"{{ p.entrega.cliente.nombre|escapejs }}",observaciones:"{{ p.entrega.cliente.observaciones|escapejs }}",estado:"{{ p.entrega.estado|escapejs }}"},{% endif %}{% endfor %}];
 if (paradasIniciales.length) dibujarRuta(paradasIniciales);
 {% endif %}
 
@@ -288,8 +288,9 @@ function dibujarRuta(pts) {
   var ll = [];
   pts.forEach(function(p) {
     if (!p.lat || !p.lon) return;
+    var markerColor = p.estado === 'entregado' ? '#1cc88a' : '#4e73df';
     var icon = L.divIcon({className:'',iconSize:[28,28],iconAnchor:[14,14],
-      html:'<div style="background:#4e73df;color:#fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:12px;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)">'+p.orden+'</div>'});
+      html:'<div style="background:'+markerColor+';color:#fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:12px;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)">'+p.orden+'</div>'});
     var m = L.marker([p.lat,p.lon],{icon:icon}).addTo(map).bindPopup(
       '<b>'+p.orden+'. '+(p.nombre||p.cliente)+'</b>' +
       (p.observaciones ? '<br><div class="mt-1" style="font-size:.8rem;background:#fffbe6;border-radius:4px;padding:3px 5px;"><i class="fas fa-sticky-note mr-1 text-warning"></i>' + p.observaciones + '</div>' : '')
