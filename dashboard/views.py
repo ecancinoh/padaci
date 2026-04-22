@@ -1,5 +1,6 @@
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.db.models import Sum
 from django.shortcuts import render
 from django.utils import timezone
 from django.db.utils import OperationalError
@@ -61,6 +62,16 @@ def index(request):
             else:
                 raise
 
+        total_consolidado_mes_raw = (
+            RutaDia.objects.filter(
+                fecha__year=hoy.year,
+                fecha__month=hoy.month,
+                estado='completada',
+            ).aggregate(total=Sum('total_consolidado'))['total']
+            or 0
+        )
+        total_consolidado_mes_label = '$ ' + f'{int(total_consolidado_mes_raw):,}'.replace(',', '.')
+
         ctx = {
             'hoy': hoy,
             'total_clientes': total_clientes,
@@ -68,6 +79,8 @@ def index(request):
             'total_conductores': total_conductores,
             'ruta_hoy': ruta_hoy,
             'total_clientes_sin_coordenadas': total_clientes_sin_coordenadas,
+            'total_consolidado_mes': total_consolidado_mes_raw,
+            'total_consolidado_mes_label': total_consolidado_mes_label,
         }
         return render(request, 'dashboard/index.html', ctx)
     except Exception:

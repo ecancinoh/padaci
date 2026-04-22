@@ -95,6 +95,23 @@
   </div>
 
   <div class="col-xl-3 col-md-6 mb-4">
+    <a href="{% url 'rendiciones:list' %}" class="kpi-card">
+      <div class="card border-left-success shadow h-100 py-2">
+        <div class="card-body">
+          <div class="row no-gutters align-items-center">
+            <div class="col mr-2">
+              <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Consolidado del mes</div>
+              <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_consolidado_mes_label }}</div>
+              <div class="text-xs text-muted mt-1">Rutas completadas &bull; {{ hoy|date:"F Y" }}</div>
+            </div>
+            <div class="col-auto"><i class="fas fa-dollar-sign fa-2x text-gray-300"></i></div>
+          </div>
+        </div>
+      </div>
+    </a>
+  </div>
+
+  <div class="col-xl-3 col-md-6 mb-4">
     {% if ruta_hoy %}
       <a href="{% url 'routes:detail' ruta_hoy.pk %}" class="kpi-card">
         <div class="card border-left-warning shadow h-100 py-2">
