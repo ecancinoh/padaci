@@ -247,6 +247,43 @@ def _compact_rows(queryset, attrs):
     return rows
 
 
+def _filtered_rendiciones_queryset(request):
+    qs = (
+        RendicionReparto.objects.select_related('ruta__conductor', 'ruta__empresa')
+        .prefetch_related(
+            'creditos_documentos',
+            'devoluciones_parciales',
+            'creditos_confianza',
+            'facturas_nulas_detalle',
+            'depositos_transferencias',
+        )
+    )
+
+    fecha = request.GET.get('fecha', '').strip()
+    fecha_desde = request.GET.get('fecha_desde', '').strip()
+    fecha_hasta = request.GET.get('fecha_hasta', '').strip()
+    repartidor = request.GET.get('repartidor', '').strip()
+    mes = request.GET.get('mes', '').strip()
+    anio = request.GET.get('anio', '').strip()
+
+    if fecha:
+        qs = qs.filter(fecha=fecha)
+    elif fecha_desde or fecha_hasta:
+        if fecha_desde:
+            qs = qs.filter(fecha__gte=fecha_desde)
+        if fecha_hasta:
+            qs = qs.filter(fecha__lte=fecha_hasta)
+    elif anio.isdigit() and mes.isdigit():
+        qs = qs.filter(fecha__year=int(anio), fecha__month=int(mes))
+    elif anio.isdigit():
+        qs = qs.filter(fecha__year=int(anio))
+
+    if repartidor:
+        qs = qs.filter(nombre_repartidor__icontains=repartidor)
+
+    return qs
+
+
 class RendicionListView(LoginRequiredMixin, ListView):
     model = RendicionReparto
     template_name = 'rendiciones/list.html'
@@ -254,14 +291,7 @@ class RendicionListView(LoginRequiredMixin, ListView):
     paginate_by = 20
 
     def get_queryset(self):
-        qs = super().get_queryset().select_related('ruta__conductor', 'ruta__empresa')
-        fecha = self.request.GET.get('fecha', '').strip()
-        repartidor = self.request.GET.get('repartidor', '').strip()
-        if fecha:
-            qs = qs.filter(fecha=fecha)
-        if repartidor:
-            qs = qs.filter(nombre_repartidor__icontains=repartidor)
-        return qs
+        return _filtered_rendiciones_queryset(self.request)
 
     def get(self, request, *args, **kwargs):
         try:
@@ -315,6 +345,131 @@ def plantilla_excel(request):
         filename='plantilla_rendicion_reparto.xlsx',
         content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     )
+    return response
+
+
+@login_required
+def rendiciones_resumen_excel(request):
+    try:
+        _load_openpyxl()
+        from openpyxl import Workbook
+        from openpyxl.styles import Alignment, Font, PatternFill
+    except Exception:
+        messages.error(
+            request,
+            'La exportacion Excel no esta disponible en este entorno. Falta instalar la dependencia openpyxl.',
+        )
+        return redirect('rendiciones:list')
+
+    rendiciones = _filtered_rendiciones_queryset(request).order_by('fecha', 'id')
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = 'Resumen rendiciones'
+    ws.freeze_panes = 'A2'
+
+    headers = [
+        'Fecha',
+        'Total kilometros recorridos',
+        'Facturas totales',
+        'Facturas entregadas',
+        'Facturas nulas',
+        'Total consolidado',
+        'Suma de monto de facturas nulas',
+        'Suma de monto de devoluciones parciales',
+        'Suma de monto de transferencias',
+        'Suma de monto de cheques',
+        'Suma de monto de creditos',
+        'Total dinero a recibir',
+        'Estacionamientos',
+        'Nombre del repartidor',
+        'Nombre del peoneta',
+    ]
+    ws.append(headers)
+
+    for cell in ws[1]:
+        cell.font = Font(bold=True, color='FFFFFF')
+        cell.fill = PatternFill(fill_type='solid', fgColor='1F4E78')
+        cell.alignment = Alignment(horizontal='center', vertical='center')
+
+    def money_total(items):
+        total = Decimal('0')
+        for item in items:
+            total += item.monto or Decimal('0')
+        return int(total)
+
+    for rendicion in rendiciones:
+        ws.append([
+            rendicion.fecha,
+            float(rendicion.total_kilometros_recorridos or 0),
+            rendicion.facturas_totales or 0,
+            rendicion.facturas_entregadas or 0,
+            rendicion.facturas_nulas or 0,
+            int(rendicion.total_consolidado or 0),
+            money_total(rendicion.facturas_nulas_detalle.all()),
+            money_total(rendicion.devoluciones_parciales.all()),
+            money_total(rendicion.depositos_transferencias.all()),
+            money_total(rendicion.creditos_documentos.all()),
+            money_total(rendicion.creditos_confianza.all()),
+            int(rendicion.total_dinero_recibir or 0),
+            int(rendicion.estacionamientos or 0),
+            rendicion.nombre_repartidor or '',
+            rendicion.nombre_peoneta or '',
+        ])
+
+    for row in ws.iter_rows(min_row=2, max_row=ws.max_row):
+        row[0].number_format = 'DD-MM-YYYY'
+        row[1].number_format = '0.0'
+        for idx in [5, 6, 7, 8, 9, 10, 11, 12]:
+            row[idx].number_format = '#,##0'
+
+    widths = {
+        'A': 14,
+        'B': 22,
+        'C': 16,
+        'D': 18,
+        'E': 14,
+        'F': 18,
+        'G': 24,
+        'H': 25,
+        'I': 20,
+        'J': 18,
+        'K': 18,
+        'L': 20,
+        'M': 16,
+        'N': 24,
+        'O': 24,
+    }
+    for col, width in widths.items():
+        ws.column_dimensions[col].width = width
+
+    ws.auto_filter.ref = ws.dimensions
+
+    fecha = request.GET.get('fecha', '').strip()
+    fecha_desde = request.GET.get('fecha_desde', '').strip()
+    fecha_hasta = request.GET.get('fecha_hasta', '').strip()
+    mes = request.GET.get('mes', '').strip()
+    anio = request.GET.get('anio', '').strip()
+
+    periodo = 'completo'
+    if fecha:
+        periodo = fecha
+    elif fecha_desde or fecha_hasta:
+        periodo = f'{fecha_desde or "inicio"}_a_{fecha_hasta or "fin"}'
+    elif anio.isdigit() and mes.isdigit():
+        periodo = f'{anio}_{int(mes):02d}'
+    elif anio.isdigit():
+        periodo = anio
+
+    out = BytesIO()
+    wb.save(out)
+    out.seek(0)
+
+    response = HttpResponse(
+        out.getvalue(),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+    response['Content-Disposition'] = f'attachment; filename="rendiciones_resumen_{periodo}.xlsx"'
     return response
 
 

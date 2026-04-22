@@ -19,11 +19,50 @@
 {% block content %}
 <div class="card shadow mb-4">
   <div class="card-header py-3">
-    <form method="get" class="form-inline">
-      <label class="mr-1">Fecha:</label>
-      <input type="date" name="fecha" value="{{ request.GET.fecha }}" class="form-control form-control-sm mr-2">
-      <input type="text" name="repartidor" value="{{ request.GET.repartidor }}" class="form-control form-control-sm mr-2" placeholder="Repartidor">
-      <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-filter"></i></button>
+    <form method="get" class="form-row align-items-end">
+      <div class="col-sm-6 col-md-2 mb-2">
+        <label class="small mb-1">Desde</label>
+        <input type="date" name="fecha_desde" value="{{ request.GET.fecha_desde }}" class="form-control form-control-sm">
+      </div>
+      <div class="col-sm-6 col-md-2 mb-2">
+        <label class="small mb-1">Hasta</label>
+        <input type="date" name="fecha_hasta" value="{{ request.GET.fecha_hasta }}" class="form-control form-control-sm">
+      </div>
+      <div class="col-sm-6 col-md-2 mb-2">
+        <label class="small mb-1">Mes</label>
+        <select name="mes" class="form-control form-control-sm">
+          <option value="">Todos</option>
+          <option value="1" {% if request.GET.mes == '1' %}selected{% endif %}>Enero</option>
+          <option value="2" {% if request.GET.mes == '2' %}selected{% endif %}>Febrero</option>
+          <option value="3" {% if request.GET.mes == '3' %}selected{% endif %}>Marzo</option>
+          <option value="4" {% if request.GET.mes == '4' %}selected{% endif %}>Abril</option>
+          <option value="5" {% if request.GET.mes == '5' %}selected{% endif %}>Mayo</option>
+          <option value="6" {% if request.GET.mes == '6' %}selected{% endif %}>Junio</option>
+          <option value="7" {% if request.GET.mes == '7' %}selected{% endif %}>Julio</option>
+          <option value="8" {% if request.GET.mes == '8' %}selected{% endif %}>Agosto</option>
+          <option value="9" {% if request.GET.mes == '9' %}selected{% endif %}>Septiembre</option>
+          <option value="10" {% if request.GET.mes == '10' %}selected{% endif %}>Octubre</option>
+          <option value="11" {% if request.GET.mes == '11' %}selected{% endif %}>Noviembre</option>
+          <option value="12" {% if request.GET.mes == '12' %}selected{% endif %}>Diciembre</option>
+        </select>
+      </div>
+      <div class="col-sm-6 col-md-1 mb-2">
+        <label class="small mb-1">Año</label>
+        <input type="number" name="anio" value="{{ request.GET.anio }}" class="form-control form-control-sm" min="2020" max="2100" placeholder="2026">
+      </div>
+      <div class="col-sm-12 col-md-3 mb-2">
+        <label class="small mb-1">Repartidor</label>
+        <input type="text" name="repartidor" value="{{ request.GET.repartidor }}" class="form-control form-control-sm" placeholder="Repartidor">
+      </div>
+      <div class="col-sm-12 col-md-2 mb-2">
+        <button type="submit" class="btn btn-primary btn-sm mr-1"><i class="fas fa-filter mr-1"></i>Filtrar</button>
+        <button type="submit" formaction="{% url 'rendiciones:resumen_excel' %}" class="btn btn-success btn-sm">
+          <i class="fas fa-file-excel mr-1"></i>Resumen Excel
+        </button>
+      </div>
+      <div class="col-12">
+        <small class="text-muted">Usa un rango de fechas para un período personalizado, o selecciona mes y año para descargar el mes completo. Si ingresas solo el año, se exportará todo ese año.</small>
+      </div>
     </form>
   </div>
   <div class="card-body">

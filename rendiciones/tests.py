@@ -1,7 +1,9 @@
 from decimal import Decimal
+from io import BytesIO
 
 from django.test import TestCase
 from django.urls import reverse
+from openpyxl import load_workbook
 
 from accounts.models import CustomUser
 from clients.models import Cliente
@@ -245,3 +247,96 @@ class RendicionCreateTests(TestCase):
 		item = rendicion.facturas_nulas_detalle.get()
 		self.assertEqual(item.numero_factura, str(entrega.pk))
 		self.assertEqual(item.monto, Decimal('3500'))
+
+	def test_export_resumen_excel_filters_by_date_range_and_includes_requested_columns(self):
+		rendicion_1 = RendicionReparto.objects.create(
+			ruta=self.ruta,
+			fecha='2026-04-09',
+			distribuidora='Distribuidora Demo',
+			nombre_repartidor='Conductor Uno',
+			nombre_peoneta='Peoneta Uno',
+			total_consolidado=Decimal('100000'),
+			estacionamientos=Decimal('5000'),
+			facturas_totales=10,
+			facturas_entregadas=8,
+			facturas_nulas=2,
+			kilometraje_inicial=Decimal('0'),
+			kilometraje_final=Decimal('12'),
+			total_kilometros_recorridos=Decimal('12'),
+			menos_items=Decimal('21000'),
+			total_dinero_recibir=Decimal('79000'),
+		)
+		rendicion_1.facturas_nulas_detalle.create(numero_factura='N-1', monto=Decimal('4000'))
+		rendicion_1.devoluciones_parciales.create(numero_factura='DP-1', motivo='Motivo', monto=Decimal('3000'))
+		rendicion_1.depositos_transferencias.create(numero_factura='T-1', monto=Decimal('6000'))
+		rendicion_1.creditos_documentos.create(numero_factura='C-1', nombre_cliente='Cliente Demo', banco='Banco', monto=Decimal('7000'))
+		rendicion_1.creditos_confianza.create(numero_factura='CR-1', autoriza_credito='Supervisor', monto=Decimal('1000'))
+
+		ruta_2 = RutaDia.objects.create(
+			fecha='2026-05-15',
+			empresa=self.empresa,
+			conductor=self.conductor,
+			total_consolidado=Decimal('50000'),
+		)
+		RendicionReparto.objects.create(
+			ruta=ruta_2,
+			fecha='2026-05-15',
+			distribuidora='Distribuidora Demo',
+			nombre_repartidor='Conductor Uno',
+			nombre_peoneta='Peoneta Dos',
+			total_consolidado=Decimal('50000'),
+			estacionamientos=Decimal('1000'),
+			facturas_totales=4,
+			facturas_entregadas=4,
+			facturas_nulas=0,
+			kilometraje_inicial=Decimal('0'),
+			kilometraje_final=Decimal('5'),
+			total_kilometros_recorridos=Decimal('5'),
+			menos_items=Decimal('1000'),
+			total_dinero_recibir=Decimal('49000'),
+		)
+
+		response = self.client.get(
+			reverse('rendiciones:resumen_excel'),
+			data={'fecha_desde': '2026-04-01', 'fecha_hasta': '2026-04-30'},
+		)
+
+		self.assertEqual(response.status_code, 200)
+		self.assertEqual(
+			response['Content-Type'],
+			'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+		)
+
+		workbook = load_workbook(BytesIO(response.content))
+		worksheet = workbook.active
+		headers = [cell.value for cell in worksheet[1]]
+		self.assertEqual(
+			headers,
+			[
+				'Fecha',
+				'Total kilometros recorridos',
+				'Facturas totales',
+				'Facturas entregadas',
+				'Facturas nulas',
+				'Total consolidado',
+				'Suma de monto de facturas nulas',
+				'Suma de monto de devoluciones parciales',
+				'Suma de monto de transferencias',
+				'Suma de monto de cheques',
+				'Suma de monto de creditos',
+				'Total dinero a recibir',
+				'Estacionamientos',
+				'Nombre del repartidor',
+				'Nombre del peoneta',
+			],
+		)
+		self.assertEqual(worksheet.max_row, 2)
+		self.assertEqual(str(worksheet['A2'].value), '2026-04-09')
+		self.assertEqual(worksheet['B2'].value, 12)
+		self.assertEqual(worksheet['G2'].value, 4000)
+		self.assertEqual(worksheet['H2'].value, 3000)
+		self.assertEqual(worksheet['I2'].value, 6000)
+		self.assertEqual(worksheet['J2'].value, 7000)
+		self.assertEqual(worksheet['K2'].value, 1000)
+		self.assertEqual(worksheet['L2'].value, 79000)
+		self.assertEqual(worksheet['N2'].value, 'Conductor Uno')
