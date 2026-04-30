@@ -152,6 +152,9 @@
     <h6 class="m-0 font-weight-bold text-primary">Accesos rápidos</h6>
   </div>
   <div class="card-body">
+    {% if user.rol == 'admin' or user.rol == 'supervisor' %}
+    <a href="{% url 'informe_servicio:index' %}" class="btn btn-danger btn-sm mr-2 mb-2"><i class="fas fa-chart-line mr-1"></i>Informe de Servicio</a>
+    {% endif %}
     <a href="{% url 'routes:list' %}" class="btn btn-primary btn-sm mr-2 mb-2"><i class="fas fa-route mr-1"></i>Ruta del Día</a>
     <a href="{% url 'routes:create' %}" class="btn btn-outline-primary btn-sm mr-2 mb-2"><i class="fas fa-plus mr-1"></i>Nueva Ruta</a>
     <a href="{% url 'clients:list' %}" class="btn btn-outline-secondary btn-sm mr-2 mb-2"><i class="fas fa-users mr-1"></i>Clientes</a>

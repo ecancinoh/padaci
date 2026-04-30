@@ -55,6 +55,7 @@ for route, module, namespace in [
     ("clientes/", "clients.urls", "clients"),
     ("empresas/", "companies.urls", "companies"),
     ("historial/", "history.urls", "history"),
+    ("informes/", "informe_servicio.urls", "informe_servicio"),
     ("mapa/", "maps.urls", "maps"),
     ("planificacion/", "planner.urls", "planner"),
     ("rutas/", "routes.urls", "routes"),

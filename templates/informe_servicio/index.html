@@ -1,0 +1,248 @@
+{% extends 'base.html' %}
+
+{% block title %}Informe de Servicio{% endblock %}
+{% block active_informe_servicio %}active{% endblock %}
+
+{% block page_heading %}
+<div class="d-sm-flex align-items-center justify-content-between mb-4">
+  <div>
+    <h1 class="h3 mb-0 text-gray-800">
+      <i class="fas fa-chart-line text-primary mr-2"></i>Informe de Servicio
+    </h1>
+    <p class="mb-0 text-muted">Resumen ejecutivo y operativo para respaldar la calidad del servicio prestado a la empresa.</p>
+  </div>
+  <div class="mt-3 mt-sm-0">
+    <a href="{% url 'informe_servicio:pdf' %}?empresa={{ filters.empresa_id }}&fecha_desde={{ filters.fecha_desde|date:'Y-m-d' }}&fecha_hasta={{ filters.fecha_hasta|date:'Y-m-d' }}" class="btn btn-danger btn-sm mr-2">
+      <i class="fas fa-file-pdf mr-1"></i>PDF
+    </a>
+    <a href="{% url 'informe_servicio:excel' %}?empresa={{ filters.empresa_id }}&fecha_desde={{ filters.fecha_desde|date:'Y-m-d' }}&fecha_hasta={{ filters.fecha_hasta|date:'Y-m-d' }}" class="btn btn-success btn-sm">
+      <i class="fas fa-file-excel mr-1"></i>Excel
+    </a>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="card shadow-sm mb-4">
+  <div class="card-header py-3">
+    <h6 class="m-0 font-weight-bold text-primary">Filtros del informe</h6>
+  </div>
+  <div class="card-body">
+    <form method="get" class="form-row align-items-end">
+      <div class="form-group col-md-4">
+        <label for="empresa">Empresa</label>
+        <select name="empresa" id="empresa" class="form-control form-control-sm">
+          {% for empresa in filters.empresas %}
+          <option value="{{ empresa.pk }}" {% if filters.empresa_id == empresa.pk|stringformat:'s' %}selected{% endif %}>{{ empresa.nombre }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group col-md-3">
+        <label for="fecha_desde">Desde</label>
+        <input type="date" class="form-control form-control-sm" name="fecha_desde" id="fecha_desde" value="{{ filters.fecha_desde|date:'Y-m-d' }}">
+      </div>
+      <div class="form-group col-md-3">
+        <label for="fecha_hasta">Hasta</label>
+        <input type="date" class="form-control form-control-sm" name="fecha_hasta" id="fecha_hasta" value="{{ filters.fecha_hasta|date:'Y-m-d' }}">
+      </div>
+      <div class="form-group col-md-2">
+        <button type="submit" class="btn btn-primary btn-sm btn-block">Actualizar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% if report.empresa %}
+<div class="alert alert-light border-left-primary shadow-sm mb-4">
+  <div class="d-flex justify-content-between flex-wrap">
+    <div>
+      <strong>Empresa:</strong> {{ report.empresa.nombre }}<br>
+      <strong>Periodo:</strong> {{ report.fecha_desde|date:'d/m/Y' }} al {{ report.fecha_hasta|date:'d/m/Y' }}
+    </div>
+    <div class="text-muted mt-2 mt-sm-0">
+      Generado el {{ report.generated_at|date:'d/m/Y H:i' }}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% if report.has_data %}
+<div class="row">
+  {% for card in report.metric_cards %}
+  <div class="col-xl-3 col-md-6 mb-4">
+    <div class="card border-left-{{ card.color }} shadow h-100 py-2">
+      <div class="card-body">
+        <div class="row no-gutters align-items-center">
+          <div class="col mr-2">
+            <div class="text-xs font-weight-bold text-{{ card.color }} text-uppercase mb-1">{{ card.label }}</div>
+            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ card.value }}</div>
+            <div class="small text-muted mt-2">{{ card.helper }}</div>
+          </div>
+          <div class="col-auto">
+            <i class="fas {{ card.icon }} fa-2x text-gray-300"></i>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="row">
+  <div class="col-lg-7 mb-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">Conclusiones automáticas</h6>
+      </div>
+      <div class="card-body">
+        {% for insight in report.insights %}
+        <div class="mb-3 pb-3 border-bottom">
+          <i class="fas fa-angle-right text-primary mr-2"></i>{{ insight }}
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-5 mb-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">Cobertura y trazabilidad</h6>
+      </div>
+      <div class="card-body">
+        <div class="mb-3">
+          <div class="small text-muted">Cobertura de evidencia</div>
+          <div class="h4 font-weight-bold text-gray-800">{{ report.summary.cobertura_evidencia_label }}</div>
+          <div class="small text-muted">{{ report.metrics.entregas_con_evidencia }} entregas exitosas con respaldo fotográfico</div>
+        </div>
+        <div class="mb-3">
+          <div class="small text-muted">Clientes atendidos</div>
+          <div class="h4 font-weight-bold text-gray-800">{{ report.metrics.clientes_atendidos }}</div>
+        </div>
+        <div>
+          <div class="small text-muted">Comunas cubiertas</div>
+          <div class="h4 font-weight-bold text-gray-800">{{ report.metrics.comunas_cubiertas }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-lg-6 mb-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">Distribución de entregas por día</h6>
+      </div>
+      <div class="card-body">
+        <div class="table-responsive">
+          <table class="table table-sm table-bordered mb-0">
+            <thead class="thead-light">
+              <tr>
+                <th>Día</th>
+                <th class="text-right">Entregas</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in report.cargas_por_dia %}
+              <tr>
+                <td>{{ item.dia }}</td>
+                <td class="text-right">{{ item.total }}</td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="2" class="text-center text-muted">No hay datos para este período.</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-6 mb-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">Sectores con mayor actividad</h6>
+      </div>
+      <div class="card-body">
+        <div class="table-responsive">
+          <table class="table table-sm table-bordered mb-0">
+            <thead class="thead-light">
+              <tr>
+                <th>Comuna / Sector</th>
+                <th class="text-right">Entregas</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in report.top_comunas %}
+              <tr>
+                <td>{{ item.nombre }}</td>
+                <td class="text-right">{{ item.total }}</td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="2" class="text-center text-muted">No hay sectores identificados.</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card shadow-sm mb-4">
+  <div class="card-header py-3 d-flex justify-content-between align-items-center">
+    <h6 class="m-0 font-weight-bold text-primary">Detalle operativo del período</h6>
+    <span class="small text-muted">Se muestran hasta 200 registros</span>
+  </div>
+  <div class="card-body">
+    <div class="table-responsive">
+      <table class="table table-sm table-bordered table-hover mb-0">
+        <thead class="thead-light">
+          <tr>
+            <th>Fecha</th>
+            <th>Cliente</th>
+            <th>Comuna</th>
+            <th>Estado</th>
+            <th>Conductor</th>
+            <th>Evidencia</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in report.detail_rows %}
+          <tr>
+            <td>{{ row.fecha_programada|date:'d/m/Y' }}</td>
+            <td>{{ row.cliente }}</td>
+            <td>{{ row.comuna }}</td>
+            <td>{{ row.estado }}</td>
+            <td>{{ row.conductor }}</td>
+            <td>
+              {% if row.evidencia %}
+              <span class="badge badge-success">Sí</span>
+              {% else %}
+              <span class="badge badge-secondary">No</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="6" class="text-center text-muted">No hay entregas en el período seleccionado.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% else %}
+<div class="card shadow-sm">
+  <div class="card-body text-center py-5">
+    <i class="fas fa-chart-line fa-3x text-gray-300 mb-3"></i>
+    <h5 class="text-gray-700">Aún no hay datos para construir el informe</h5>
+    <p class="text-muted mb-0">Ajusta el rango de fechas o verifica que la empresa tenga entregas, rutas o rendiciones registradas.</p>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
