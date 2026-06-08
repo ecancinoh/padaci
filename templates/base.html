@@ -113,6 +113,17 @@
       </li>
 
       {% if user.rol == 'admin' or user.rol == 'supervisor' %}
+      <li class="nav-item {% block active_asistencia %}{% endblock %}">
+        {% url 'asistencia:diaria' as url_asistencia_diaria %}
+        <a class="nav-link" href="{{ url_asistencia_diaria|default:'#' }}">
+          <i class="fas fa-fw fa-clipboard-check"></i>
+          <span>Asistencia</span>
+        </a>
+      </li>
+
+      {% endif %}
+
+      {% if user.rol == 'admin' or user.rol == 'supervisor' %}
       <li class="nav-item {% block active_informe_servicio %}{% endblock %}">
         {% url 'informe_servicio:index' as url_informe_servicio_index %}
         <a class="nav-link" href="{{ url_informe_servicio_index|default:'#' }}">

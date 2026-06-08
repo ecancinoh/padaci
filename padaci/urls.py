@@ -51,6 +51,7 @@ urlpatterns = [
 
 for route, module, namespace in [
     ("accounts/", "accounts.urls", "accounts"),
+    ("asistencia/", "asistencia.urls", "asistencia"),
     ("dashboard/", "dashboard.urls", "dashboard"),
     ("clientes/", "clients.urls", "clients"),
     ("empresas/", "companies.urls", "companies"),

@@ -1,0 +1,81 @@
+{% extends 'base.html' %}
+
+{% block title %}Asistencias{% endblock %}
+{% block active_asistencia %}active{% endblock %}
+
+{% block page_heading %}
+<div class="d-sm-flex align-items-center justify-content-between mb-4">
+  <h1 class="h3 mb-0 text-gray-800"><i class="fas fa-list-check mr-2 text-primary"></i>Historial de asistencia</h1>
+  <div>
+    <a href="{% url 'asistencia:diaria' %}" class="btn btn-primary btn-sm mr-2">
+      <i class="fas fa-clipboard-check mr-1"></i>Registro diario
+    </a>
+    <a href="{% url 'asistencia:reporte_mensual' %}" class="btn btn-info btn-sm">
+      <i class="fas fa-chart-bar mr-1"></i>Reporte mensual
+    </a>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="card shadow mb-4">
+  <div class="card-header py-3">
+    <form method="get" class="form-row align-items-end">
+      <div class="col-md-3 mb-2">
+        <label class="small mb-1" for="fecha">Fecha</label>
+        <input type="date" name="fecha" id="fecha" value="{{ request.GET.fecha }}" class="form-control form-control-sm">
+      </div>
+      <div class="col-md-4 mb-2">
+        <label class="small mb-1" for="q">Buscar trabajador</label>
+        <input type="text" name="q" id="q" value="{{ request.GET.q }}" class="form-control form-control-sm" placeholder="Nombre o usuario">
+      </div>
+      <div class="col-md-2 mb-2">
+        <button type="submit" class="btn btn-primary btn-sm btn-block">Filtrar</button>
+      </div>
+    </form>
+  </div>
+  <div class="card-body">
+    <div class="table-responsive">
+      <table class="table table-bordered table-hover table-sm mb-0">
+        <thead class="thead-light">
+          <tr>
+            <th>Fecha</th>
+            <th>Trabajador</th>
+            <th>Rol</th>
+            <th>Estado</th>
+            <th>Observación</th>
+            <th>Registrado por</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in asistencias %}
+          <tr>
+            <td>{{ item.fecha|date:'d/m/Y' }}</td>
+            <td>{{ item.usuario.get_full_name }}</td>
+            <td>{{ item.usuario.get_rol_display }}</td>
+            <td>
+              {% if item.estado == 'presente' %}
+              <span class="badge badge-success">Presente</span>
+              {% else %}
+              <span class="badge badge-danger">Ausente</span>
+              {% endif %}
+            </td>
+            <td>{{ item.observacion|default:'-' }}</td>
+            <td>{% if item.registrado_por %}{{ item.registrado_por.get_full_name }}{% else %}-{% endif %}</td>
+            <td>
+              <a href="{% url 'asistencia:update' item.pk %}" class="btn btn-warning btn-sm"><i class="fas fa-edit"></i></a>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="7" class="text-center text-muted">No hay asistencias registradas para el filtro seleccionado.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% include 'partials/pagination.html' with page_obj=page_obj %}
+  </div>
+</div>
+{% endblock %}

@@ -63,6 +63,7 @@ THIRD_PARTY = [
 
 LOCAL_APPS = [
     'accounts',
+    'asistencia',
     'clients',
     'companies',
     'deliveries',
