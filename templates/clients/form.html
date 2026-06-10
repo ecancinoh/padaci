@@ -85,6 +85,15 @@
             {% if form.tiempo_estimado_atencion.errors %}<div class="text-danger small mt-1">{{ form.tiempo_estimado_atencion.errors }}</div>{% endif %}
           </div>
 
+          <div class="form-group">
+            <label for="{{ form.equivalencia_entregas.id_for_label }}" class="font-weight-bold">
+              <i class="fas fa-layer-group mr-1 text-primary"></i> Equivalencia de entregas
+            </label>
+            {{ form.equivalencia_entregas }}
+            <small class="form-text text-muted">Valor por defecto 1. Usa valores mayores para clientes que cuentan como múltiples entregas.</small>
+            {% if form.equivalencia_entregas.errors %}<div class="text-danger small mt-1">{{ form.equivalencia_entregas.errors }}</div>{% endif %}
+          </div>
+
           <!-- URLs generadas automáticamente -->
           <div id="url-preview-section" class="d-none">
             <hr>

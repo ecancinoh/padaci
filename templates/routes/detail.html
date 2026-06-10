@@ -18,6 +18,20 @@
   .step-badge { display:inline-flex;align-items:center;justify-content:center;
                 width:26px;height:26px;border-radius:50%;background:#4e73df;color:#fff;
                 font-weight:bold;font-size:.85rem;margin-right:6px; }
+  .factura-mobile-card { border:1px solid #dfe3ee; border-radius:.5rem; background:#fff; padding:.65rem; margin-bottom:.6rem; }
+  .factura-mobile-card.factura-pendiente { border-color:#f6c23e; background:#fff8e6; }
+  .factura-mobile-grid { display:grid; grid-template-columns: 1fr 1fr; gap:.45rem .5rem; }
+  .factura-field label { font-size:.72rem; color:#6c757d; margin:0 0 .15rem; font-weight:600; display:block; }
+  .factura-field input, .factura-field select { height:31px; font-size:.82rem; }
+  .factura-mobile-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:.45rem; }
+  .factura-mobile-title { font-size:.86rem; font-weight:700; color:#4e73df; }
+  .factura-table-wrap { overflow-x:auto; border:1px solid #dee2e6; border-radius:.35rem; }
+  .factura-table { min-width: 1060px; margin-bottom:0; }
+  .factura-table thead th { white-space:nowrap; }
+  .factura-table input, .factura-table select { min-width:110px; }
+  @media (max-width: 767.98px) {
+    .factura-mobile-grid { grid-template-columns: 1fr; }
+  }
 </style>
 {% endblock %}
 
@@ -140,9 +154,9 @@
         <!-- ── PASO 2 + 3 (compartido por ambas pestañas) ── -->
         <div id="step2" class="d-none">
           <hr>
-          <h6 class="font-weight-bold text-gray-700"><span class="step-badge">2</span>Confirmar / Editar clientes</h6>
-          <div id="listaClientesOCR" class="mb-2"></div>
-          <div id="noEncontradosSection" class="d-none"></div>
+          <h6 class="font-weight-bold text-gray-700"><span class="step-badge">2</span>Confirmar facturas y cliente</h6>
+          <div id="facturaRowsContainer" class="mb-2"></div>
+          <div id="listaClientesOCR" class="mb-2 d-none"></div>
 
           <div class="input-group input-group-sm mb-1">
             <input type="text" id="searchClienteInput" class="form-control" placeholder="Agregar cliente manualmente…" autocomplete="off" oninput="buscarCliente(this.value)">
@@ -162,6 +176,40 @@
             <small class="ml-1 text-muted">Creando entregas y optimizando…</small>
           </div>
           <div id="crearResult" class="d-none"></div>
+        </div>
+
+        <div class="modal fade" id="crearClienteModal" tabindex="-1" role="dialog" aria-labelledby="crearClienteModalLabel" aria-hidden="true">
+          <div class="modal-dialog" role="document">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h5 class="modal-title" id="crearClienteModalLabel"><i class="fas fa-user-plus mr-1 text-primary"></i>Crear nuevo cliente</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                  <span aria-hidden="true">&times;</span>
+                </button>
+              </div>
+              <div class="modal-body">
+                <div class="form-group">
+                  <label for="modalClienteNombre">Nombre</label>
+                  <input type="text" id="modalClienteNombre" class="form-control" maxlength="200">
+                </div>
+                <div class="form-group">
+                  <label for="modalClienteDireccion">Dirección</label>
+                  <textarea id="modalClienteDireccion" class="form-control" rows="2"></textarea>
+                </div>
+                <div class="form-group mb-0">
+                  <label for="modalClienteComuna">Comuna</label>
+                  <input type="text" id="modalClienteComuna" class="form-control" maxlength="100">
+                </div>
+                <small class="text-muted d-block mt-2">Se precargan datos desde la línea OCR seleccionada.</small>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancelar</button>
+                <button type="button" id="btnGuardarClienteRapido" class="btn btn-primary" onclick="guardarClienteRapidoDesdeModal()">
+                  <i class="fas fa-save mr-1"></i>Guardar y asociar
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
 
         {% if ruta.total_paradas > 1 %}
@@ -200,6 +248,8 @@
                   <br><small class="text-muted"><i class="fas fa-building mr-1"></i>{{ p.entrega.empresa.nombre|default:"Sin empresa" }}</small>
                   <br><small class="text-muted"><i class="fas fa-user mr-1"></i>{{ p.entrega.conductor.get_full_name|default:"Sin conductor" }}</small>
                   <br><small class="text-muted"><i class="fas fa-calendar-alt mr-1"></i>Programada: {{ p.entrega.fecha_programada|date:"d-m-Y" }}</small>
+                  <br><small class="text-muted"><i class="fas fa-file-invoice mr-1"></i>Factura: {{ p.entrega.numero_factura_ref|default:"—"|default_if_none:"—" }}</small>
+                  <br><small class="text-muted"><i class="fas fa-receipt mr-1"></i>Monto OCR: ${{ p.entrega.total_factura_ref|default:0|floatformat:0 }}</small>
                   <br><small class="text-muted"><i class="fas fa-wallet mr-1"></i>Pagado: ${{ p.entrega.total_pagado|default:0 }}</small>
                   <br><small class="text-success {% if not p.entrega.fecha_entrega %}d-none{% endif %}" id="fecha-entrega-{{ p.entrega.pk }}"><i class="fas fa-check-circle mr-1"></i>Entregada: {% if p.entrega.fecha_entrega %}{{ p.entrega.fecha_entrega|date:"d-m-Y H:i" }}{% endif %}</small>
                   {% if p.entrega.descripcion %}<br><small class="text-muted"><i class="fas fa-box-open mr-1"></i>{{ p.entrega.descripcion }}</small>{% endif %}
@@ -254,12 +304,12 @@ var URL_OCR          = '{% url "routes:procesar_foto" ruta.pk %}';
 var URL_CREAR        = '{% url "routes:crear_entregas" ruta.pk %}';
 var URL_OPT          = '{% url "routes:optimizar" ruta.pk %}';
 var URL_SEARCH       = '{% url "routes:buscar_clientes" %}';
+var URL_CREATE_CLIENT_RAPIDO = '{% url "routes:crear_cliente_rapido" ruta.pk %}';
 var URL_TEXTO        = '{% url "routes:buscar_por_texto" ruta.pk %}';
 var URL_ACTUALIZAR_PARADA = '{% url "routes:actualizar_parada" ruta.pk %}';
 var URL_ELIMINAR_PARADA = '{% url "routes:eliminar_parada" ruta.pk %}';
 var URL_ENTREGA_ESTADO_BASE = '{% url "routes:entregas_update_estado" 0 %}';
 var URL_UPDATE_CLIENT_BASE = '{% url "clients:update" 0 %}';
-var URL_CREATE_CLIENT = '{% url "clients:create" %}';
 var ESTADOS_ENTREGA = [
   {value:'pendiente', label:'Pendiente'},
   {value:'en_ruta', label:'En Ruta'},
@@ -270,6 +320,8 @@ var ESTADOS_ENTREGA = [
 ];
 
 var clientesSeleccionados = {};
+var lineasFacturaSeleccionadas = [];
+var indiceLineaModalCliente = null;
 
 /* ── MAPA ── */
 var map = L.map('mapRuta').setView([-34.17, -70.73], 10);
@@ -337,7 +389,6 @@ function buscarPorTexto() {
     } else {
       document.getElementById('listaClientesOCR').innerHTML = '<div class="alert alert-warning alert-sm py-2"><i class="fas fa-exclamation-triangle mr-1"></i>No se encontraron coincidencias. Ajusta los nombres o agrégalos manualmente.</div>';
     }
-    renderNoEncontrados(data.no_encontrados || []);
     document.getElementById('step2').classList.remove('d-none');
     updateResumen();
   })
@@ -356,19 +407,40 @@ function procesarFoto() {
   .then(function(r){return r.json();})
   .then(function(data) {
     document.getElementById('ocrSpinner').classList.add('d-none');
+    if (data.warning) {
+      showAlert('warning', data.warning);
+    }
     if (data.texto_extraido) {
       document.getElementById('textoExtraido').textContent = data.texto_extraido;
       document.getElementById('textoExtraidoSection').classList.remove('d-none');
     }
     clientesSeleccionados = {};
-    if (data.clientes && data.clientes.length > 0) {
+    lineasFacturaSeleccionadas = [];
+    if (data.facturas && data.facturas.length > 0) {
+      lineasFacturaSeleccionadas = data.facturas.map(function(f){
+        return {
+          activo: true,
+          documento: f.documento || '',
+          nombre_cliente: f.nombre_cliente || '',
+          direccion_cliente: f.direccion_cliente || '',
+          dia: f.dia || '',
+          mes: f.mes || '',
+          total: f.total || 0,
+          cond_pago: f.cond_pago || '',
+          comuna: f.comuna || '',
+          cliente_id: f.cliente_id || '',
+          candidatos: f.candidatos || [],
+          requiere_revision: !!f.requiere_revision
+        };
+      });
+      renderFacturasEditor();
+    } else if (data.clientes && data.clientes.length > 0) {
       data.clientes.forEach(function(c){ clientesSeleccionados[c.id]=c; });
       renderListaClientesSeleccionados();
     } else {
       document.getElementById('listaClientesOCR').innerHTML = '<div class="alert alert-warning alert-sm py-2"><i class="fas fa-exclamation-triangle mr-1"></i>No se detectaron clientes automáticamente. Agrega manualmente.</div>';
       document.getElementById('btnOCR').disabled = false;
     }
-    renderNoEncontrados(data.no_encontrados || []);
     document.getElementById('step2').classList.remove('d-none');
     updateResumen();
   })
@@ -396,6 +468,177 @@ function renderListaClientesSeleccionados() {
   document.getElementById('listaClientesOCR').innerHTML = html;
 }
 
+function renderFacturasEditor() {
+  var container = document.getElementById('facturaRowsContainer');
+  if (!lineasFacturaSeleccionadas.length) {
+    container.innerHTML = '';
+    return;
+  }
+
+  var isMobile = window.matchMedia('(max-width: 991.98px)').matches;
+  if (isMobile) {
+    renderFacturasEditorMobile(container);
+    return;
+  }
+  renderFacturasEditorDesktop(container);
+}
+
+function renderFacturasEditorDesktop(container) {
+  var html = '<div class="factura-table-wrap">' +
+    '<table class="table table-sm factura-table">' +
+    '<thead class="thead-light"><tr>' +
+    '<th></th><th>Factura</th><th>Cliente OCR</th><th>Dirección</th><th>Día</th><th>Mes</th><th>Total</th><th>Cond. Pago</th><th>Comuna</th><th>Cliente asociado</th></tr></thead><tbody>';
+
+  lineasFacturaSeleccionadas.forEach(function(l, idx){
+    var opciones = buildClienteOptions(l);
+    var rowClass = (!l.cliente_id) ? 'table-warning' : '';
+    html += '<tr class="'+rowClass+'">' +
+      '<td><input type="checkbox" '+(l.activo ? 'checked' : '')+' onchange="actualizarLineaFactura('+idx+',\'activo\', this.checked)"></td>' +
+      '<td><input class="form-control form-control-sm" value="'+escHtml(l.documento || '')+'" onchange="actualizarLineaFactura('+idx+',\'documento\', this.value)"></td>' +
+      '<td><input class="form-control form-control-sm" value="'+escHtml(l.nombre_cliente || '')+'" onchange="actualizarLineaFactura('+idx+',\'nombre_cliente\', this.value)"></td>' +
+      '<td><input class="form-control form-control-sm" value="'+escHtml(l.direccion_cliente || '')+'" onchange="actualizarLineaFactura('+idx+',\'direccion_cliente\', this.value)"></td>' +
+      '<td><input type="number" min="1" max="31" class="form-control form-control-sm" value="'+escHtml(l.dia || '')+'" onchange="actualizarLineaFactura('+idx+',\'dia\', this.value)"></td>' +
+      '<td><input type="number" min="1" max="12" class="form-control form-control-sm" value="'+escHtml(l.mes || '')+'" onchange="actualizarLineaFactura('+idx+',\'mes\', this.value)"></td>' +
+      '<td><input type="number" min="0" step="1" class="form-control form-control-sm" value="'+escHtml(l.total || 0)+'" onchange="actualizarLineaFactura('+idx+',\'total\', this.value)"></td>' +
+      '<td><input class="form-control form-control-sm" value="'+escHtml(l.cond_pago || '')+'" onchange="actualizarLineaFactura('+idx+',\'cond_pago\', this.value)"></td>' +
+      '<td><input class="form-control form-control-sm" value="'+escHtml(l.comuna || '')+'" onchange="actualizarLineaFactura('+idx+',\'comuna\', this.value)"></td>' +
+      '<td><select class="form-control form-control-sm" onchange="actualizarLineaFactura('+idx+',\'cliente_id\', this.value)">'+opciones+'</select></td>' +
+      '</tr>';
+  });
+
+  html += '</tbody></table></div>' +
+    '<small class="text-muted d-block mt-2"><i class="fas fa-info-circle mr-1"></i>Las filas en amarillo requieren selección de cliente antes de crear la entrega.</small>';
+  container.innerHTML = html;
+}
+
+function renderFacturasEditorMobile(container) {
+  var html = '';
+  lineasFacturaSeleccionadas.forEach(function(l, idx){
+    var opciones = buildClienteOptions(l);
+
+    var pendienteClass = (!l.cliente_id) ? ' factura-pendiente' : '';
+    html +=
+      '<div class="factura-mobile-card'+pendienteClass+'">' +
+        '<div class="factura-mobile-header">' +
+          '<div class="factura-mobile-title">Factura ' + escHtml(l.documento || ('#' + (idx + 1))) + '</div>' +
+          '<div><input type="checkbox" '+(l.activo ? 'checked' : '')+' onchange="actualizarLineaFactura('+idx+',\'activo\', this.checked)"></div>' +
+        '</div>' +
+        '<div class="factura-mobile-grid">' +
+          '<div class="factura-field"><label>Número factura</label><input class="form-control form-control-sm" value="'+escHtml(l.documento || '')+'" onchange="actualizarLineaFactura('+idx+',\'documento\', this.value)"></div>' +
+          '<div class="factura-field"><label>Cliente OCR</label><input class="form-control form-control-sm" value="'+escHtml(l.nombre_cliente || '')+'" onchange="actualizarLineaFactura('+idx+',\'nombre_cliente\', this.value)"></div>' +
+          '<div class="factura-field" style="grid-column:1 / -1;"><label>Dirección</label><input class="form-control form-control-sm" value="'+escHtml(l.direccion_cliente || '')+'" onchange="actualizarLineaFactura('+idx+',\'direccion_cliente\', this.value)"></div>' +
+          '<div class="factura-field"><label>Día</label><input type="number" min="1" max="31" class="form-control form-control-sm" value="'+escHtml(l.dia || '')+'" onchange="actualizarLineaFactura('+idx+',\'dia\', this.value)"></div>' +
+          '<div class="factura-field"><label>Mes</label><input type="number" min="1" max="12" class="form-control form-control-sm" value="'+escHtml(l.mes || '')+'" onchange="actualizarLineaFactura('+idx+',\'mes\', this.value)"></div>' +
+          '<div class="factura-field"><label>Total</label><input type="number" min="0" step="1" class="form-control form-control-sm" value="'+escHtml(l.total || 0)+'" onchange="actualizarLineaFactura('+idx+',\'total\', this.value)"></div>' +
+          '<div class="factura-field"><label>Condición pago</label><input class="form-control form-control-sm" value="'+escHtml(l.cond_pago || '')+'" onchange="actualizarLineaFactura('+idx+',\'cond_pago\', this.value)"></div>' +
+          '<div class="factura-field"><label>Comuna</label><input class="form-control form-control-sm" value="'+escHtml(l.comuna || '')+'" onchange="actualizarLineaFactura('+idx+',\'comuna\', this.value)"></div>' +
+          '<div class="factura-field" style="grid-column:1 / -1;"><label>Cliente asociado</label><select class="form-control form-control-sm" onchange="actualizarLineaFactura('+idx+',\'cliente_id\', this.value)">'+opciones+'</select></div>' +
+        '</div>' +
+      '</div>';
+  });
+
+  html += '<small class="text-muted d-block mt-2"><i class="fas fa-info-circle mr-1"></i>En móvil se muestran tarjetas para facilitar edición campo a campo.</small>';
+  container.innerHTML = html;
+}
+
+function actualizarLineaFactura(index, campo, valor) {
+  if (!lineasFacturaSeleccionadas[index]) return;
+  if (campo === 'cliente_id' && String(valor) === '__create__') {
+    abrirModalCrearCliente(index);
+    return;
+  }
+  lineasFacturaSeleccionadas[index][campo] = valor;
+  renderFacturasEditor();
+  updateResumen();
+}
+
+function buildClienteOptions(linea) {
+  var opciones = '<option value="">Seleccionar</option>';
+  (linea.candidatos || []).forEach(function(c){
+    var selected = String(c.id) === String(linea.cliente_id) ? 'selected' : '';
+    opciones += '<option value="'+c.id+'" '+selected+'>'+escHtml(c.nombre)+' - '+escHtml(c.direccion || 'Sin dirección')+' - '+escHtml(c.comuna || 'Sin comuna')+'</option>';
+  });
+  opciones += '<option value="__create__">+ Crear nuevo cliente...</option>';
+  return opciones;
+}
+
+function abrirModalCrearCliente(index) {
+  indiceLineaModalCliente = index;
+  var linea = lineasFacturaSeleccionadas[index] || {};
+  document.getElementById('modalClienteNombre').value = linea.nombre_cliente || '';
+  document.getElementById('modalClienteDireccion').value = linea.direccion_cliente || '';
+  document.getElementById('modalClienteComuna').value = linea.comuna || '';
+  $('#crearClienteModal').modal('show');
+}
+
+function guardarClienteRapidoDesdeModal() {
+  if (indiceLineaModalCliente === null || !lineasFacturaSeleccionadas[indiceLineaModalCliente]) {
+    showAlert('danger', 'No se encontró la línea a asociar.');
+    return;
+  }
+
+  var btn = document.getElementById('btnGuardarClienteRapido');
+  var nombre = (document.getElementById('modalClienteNombre').value || '').trim();
+  var direccion = (document.getElementById('modalClienteDireccion').value || '').trim();
+  var comuna = (document.getElementById('modalClienteComuna').value || '').trim();
+
+  if (!nombre) {
+    showAlert('warning', 'El nombre del cliente es obligatorio.');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Guardando...';
+
+  fetch(URL_CREATE_CLIENT_RAPIDO, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json', 'X-CSRFToken': CSRF},
+    body: JSON.stringify({
+      nombre: nombre,
+      direccion: direccion,
+      comuna: comuna
+    })
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(data) {
+    if (data.error || !data.cliente) {
+      showAlert('danger', data.error || 'No se pudo crear el cliente.');
+      return;
+    }
+
+    var linea = lineasFacturaSeleccionadas[indiceLineaModalCliente];
+    var nuevo = data.cliente;
+    linea.cliente_id = String(nuevo.id);
+    linea.candidatos = linea.candidatos || [];
+    if (!linea.candidatos.some(function(c){ return String(c.id) === String(nuevo.id); })) {
+      linea.candidatos.unshift({
+        id: nuevo.id,
+        nombre: nuevo.nombre,
+        direccion: nuevo.direccion || '',
+        comuna: nuevo.comuna || '',
+        score: 1.0
+      });
+    }
+
+    renderFacturasEditor();
+    updateResumen();
+    $('#crearClienteModal').modal('hide');
+    showAlert('success', 'Cliente creado y asociado correctamente.');
+  })
+  .catch(function(e) {
+    showAlert('danger', 'Error al crear cliente: ' + e.message);
+  })
+  .finally(function() {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-save mr-1"></i>Guardar y asociar';
+  });
+}
+
+window.addEventListener('resize', function() {
+  if (!lineasFacturaSeleccionadas.length) return;
+  renderFacturasEditor();
+});
+
 function toggleCliente(id) {
   var chk = document.getElementById('chk-'+id); if(!chk) return;
   chk.checked = !chk.checked;
@@ -405,6 +648,14 @@ function toggleCliente(id) {
 }
 
 function updateResumen() {
+  if (lineasFacturaSeleccionadas.length) {
+    var activas = lineasFacturaSeleccionadas.filter(function(l){ return !!l.activo; });
+    var pendientes = activas.filter(function(l){ return !l.cliente_id; }).length;
+    document.getElementById('resumenSeleccion').innerHTML =
+      '<i class="fas fa-file-invoice mr-1"></i>Líneas activas: <strong>'+activas.length+'</strong>. ' +
+      'Pendientes sin cliente: <strong>'+pendientes+'</strong>.';
+    return;
+  }
   var n = Object.keys(clientesSeleccionados).length;
   document.getElementById('resumenSeleccion').innerHTML = '<i class="fas fa-users mr-1"></i>Se crearán entregas para <strong>'+n+'</strong> cliente(s).';
 }
@@ -457,12 +708,23 @@ function agregarManual(id, nombre, comuna) {
 
 /* ── PASO 3: CREAR ENTREGAS ── */
 function crearEntregas() {
-  var ids = Object.keys(clientesSeleccionados).map(Number);
-  if (!ids.length) { showAlert('warning','Selecciona al menos un cliente.'); return; }
+  var payload = {};
+  if (lineasFacturaSeleccionadas.length) {
+    var lineasActivas = lineasFacturaSeleccionadas.filter(function(l){ return !!l.activo; });
+    if (!lineasActivas.length) {
+      showAlert('warning','Selecciona al menos una línea de factura.');
+      return;
+    }
+    payload.lineas = lineasActivas;
+  } else {
+    var ids = Object.keys(clientesSeleccionados).map(Number);
+    if (!ids.length) { showAlert('warning','Selecciona al menos un cliente.'); return; }
+    payload.cliente_ids = ids;
+  }
   document.getElementById('btnCrearEntregas').disabled = true;
   document.getElementById('crearSpinner').classList.remove('d-none');
   document.getElementById('crearResult').classList.add('d-none');
-  fetch(URL_CREAR, {method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken':CSRF}, body:JSON.stringify({cliente_ids:ids})})
+  fetch(URL_CREAR, {method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken':CSRF}, body:JSON.stringify(payload)})
   .then(function(r){return r.json();})
   .then(function(data) {
     document.getElementById('crearSpinner').classList.add('d-none');
@@ -470,6 +732,10 @@ function crearEntregas() {
     if (data.error) { showAlert('danger',data.error); return; }
     var msg = '<div class="alert alert-success py-2 mt-2"><i class="fas fa-check-circle mr-1"></i><strong>¡Listo!</strong> '+
       data.creadas+' entregas creadas, '+data.existentes+' ya existían. <strong>'+data.total_paradas+' paradas</strong> optimizadas.</div>';
+    if (data.pendientes && data.pendientes > 0) {
+      msg += '<div class="alert alert-warning py-2 mt-2"><i class="fas fa-exclamation-triangle mr-1"></i>'+
+        data.pendientes+' línea(s) quedaron pendientes por cliente sin asociar.</div>';
+    }
     document.getElementById('crearResult').innerHTML = msg;
     document.getElementById('crearResult').classList.remove('d-none');
     document.getElementById('totalParadasBadge').textContent = data.total_paradas;
@@ -579,6 +845,8 @@ function renderParadas(paradas) {
     var empresa = p.empresa ? escHtml(p.empresa) : 'Sin empresa';
     var conductor = p.conductor ? escHtml(p.conductor) : 'Sin conductor';
     var fechaProgramada = p.fecha_programada ? escHtml(p.fecha_programada) : '—';
+    var numeroFactura = p.numero_factura ? escHtml(p.numero_factura) : '—';
+    var montoFacturaOcr = (typeof p.total_factura_ref === 'number') ? p.total_factura_ref : 0;
     var totalPagado = (typeof p.total_pagado === 'number') ? p.total_pagado : 0;
     var fechaEntrega = '<br><small class="text-success ' + (p.fecha_entrega ? '' : 'd-none') + '" id="fecha-entrega-' + p.entrega_id + '"><i class="fas fa-check-circle mr-1"></i>Entregada: ' + (p.fecha_entrega ? escHtml(p.fecha_entrega) : '') + '</small>';
     var descripcion = p.descripcion ? '<br><small class="text-muted"><i class="fas fa-box-open mr-1"></i>'+escHtml(p.descripcion)+'</small>' : '';
@@ -591,6 +859,8 @@ function renderParadas(paradas) {
           '<br><small class="text-muted"><i class="fas fa-building mr-1"></i>'+empresa+'</small>'+
           '<br><small class="text-muted"><i class="fas fa-user mr-1"></i>'+conductor+'</small>'+
           '<br><small class="text-muted"><i class="fas fa-calendar-alt mr-1"></i>Programada: '+fechaProgramada+'</small>'+
+          '<br><small class="text-muted"><i class="fas fa-file-invoice mr-1"></i>Factura: '+numeroFactura+'</small>'+
+          '<br><small class="text-muted"><i class="fas fa-receipt mr-1"></i>Monto OCR: $'+escHtml(montoFacturaOcr)+'</small>'+
           '<br><small class="text-muted"><i class="fas fa-wallet mr-1"></i>Pagado: $'+escHtml(totalPagado)+'</small>'+
           fechaEntrega +
           descripcion +
@@ -607,32 +877,6 @@ function renderParadas(paradas) {
   });
   var sp = document.getElementById('sinParadas'); if(sp) sp.remove();
   document.getElementById('paradasContainer').innerHTML = html;
-}
-
-/* ── NO ENCONTRADOS ── */
-function renderNoEncontrados(lineas) {
-  var section = document.getElementById('noEncontradosSection');
-  if (!lineas || !lineas.length) {
-    section.classList.add('d-none');
-    section.innerHTML = '';
-    return;
-  }
-  var rows = lineas.map(function(nombre) {
-    var url = URL_CREATE_CLIENT + '?nombre=' + encodeURIComponent(nombre);
-    return '<div class="d-flex align-items-center justify-content-between px-2 py-1 border-bottom">' +
-      '<span class="small text-danger"><i class="fas fa-user-times mr-1"></i>' + escHtml(nombre) + '</span>' +
-      '<a href="' + url + '" target="_blank" class="btn btn-outline-primary btn-sm py-0 px-2 ml-2" style="font-size:.75rem;white-space:nowrap;">' +
-      '<i class="fas fa-user-plus mr-1"></i>Registrar</a></div>';
-  }).join('');
-  section.innerHTML =
-    '<div class="alert alert-warning py-2 mb-2">' +
-      '<strong><i class="fas fa-exclamation-triangle mr-1"></i>' + lineas.length + ' nombre(s) no encontrado(s) en la base de datos:</strong>' +
-      '<div class="border rounded mt-2 bg-white" style="max-height:160px;overflow-y:auto;">' + rows + '</div>' +
-      '<div class="small text-muted mt-1"><i class="fas fa-info-circle mr-1"></i>' +
-        'Registra el cliente en la nueva pestaña y luego agrégalo con el buscador de abajo.' +
-      '</div>' +
-    '</div>';
-  section.classList.remove('d-none');
 }
 
 /* ── UTILS ── */

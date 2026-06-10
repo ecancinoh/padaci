@@ -56,6 +56,23 @@
 
 <form method="post">
   {% csrf_token %}
+  {% if autocompletado_info and autocompletado_info.advertencias_diferencia|length > 0 %}
+  <div class="alert alert-warning mt-3 mb-4" role="alert">
+    <h6 class="alert-heading mb-2"><i class="fas fa-exclamation-triangle mr-2 text-warning"></i><strong>⚠️ Diferencias OCR vs Pagos Manuales</strong></h6>
+    <p class="mb-2 small">Se detectaron discrepancias entre los montos extraídos por OCR y los pagos registrados manualmente:</p>
+    <ul class="mb-0 small">
+      {% for alerta in autocompletado_info.advertencias_diferencia %}
+        <li class="mb-1">
+          <strong>Factura {{ alerta.numero_factura }}</strong> ({{ alerta.cliente }}):
+          <br><span class="text-muted">OCR: <strong style="color:#e74c3c;">${{ alerta.monto_ocr|floatformat:0 }}</strong> vs Manual: <strong style="color:#27ae60;">${{ alerta.monto_manual|floatformat:0 }}</strong></span>
+          <span class="badge badge-info ml-1">Δ ${{ alerta.diferencia|floatformat:0 }}</span>
+        </li>
+      {% endfor %}
+    </ul>
+    <hr class="my-2">
+    <small class="text-muted"><i class="fas fa-check-circle mr-1" style="color:#27ae60;"></i>El sistema está usando los montos <strong>registrados manualmente</strong> en cada entrega para esta rendición.</small>
+  </div>
+  {% endif %}
   {% if autocompletado_info %}
     <div class="alert alert-{% if autocompletado_info.total_items %}info{% else %}warning{% endif %}">
       {% if autocompletado_info.total_items %}

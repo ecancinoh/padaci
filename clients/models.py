@@ -37,6 +37,11 @@ class Cliente(models.Model):
         verbose_name='Tiempo estimado de atencion (min)',
         help_text='Minutos estimados para atender este cliente en una visita.',
     )
+    equivalencia_entregas = models.PositiveIntegerField(
+        default=1,
+        verbose_name='Equivalencia de entregas',
+        help_text='Cantidad equivalente de entregas para este cliente (ej: 10 para clientes especiales).',
+    )
     activo = models.BooleanField(default=True, verbose_name='Activo')
     fecha_creacion = models.DateTimeField(auto_now_add=True)
     fecha_actualizacion = models.DateTimeField(auto_now=True)
@@ -61,6 +66,17 @@ class Cliente(models.Model):
         if self.tiene_coordenadas():
             return f'https://maps.google.com/?q={self.latitud},{self.longitud}'
         return ''
+
+    @property
+    def url_google_maps_busqueda(self):
+        """URL de búsqueda exacta en Google Maps usando la dirección completa."""
+        parts = [self.direccion, self.comuna, self.ciudad, self.region, 'Chile']
+        query = ', '.join(part.strip() for part in parts if part and str(part).strip())
+        if query:
+            from urllib.parse import quote_plus
+
+            return f'https://www.google.com/maps/search/?api=1&query={quote_plus(query)}'
+        return self.url_google_maps
 
     @property
     def url_waze(self):

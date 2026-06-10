@@ -7,7 +7,7 @@ from django.views.generic import ListView, CreateView, UpdateView, DeleteView, D
 from django.urls import reverse_lazy
 from .mixins import RolRestringidoMixin
 from .models import CustomUser
-from .forms import CustomAuthForm, CustomUserCreationForm, CustomUserUpdateForm, PasswordCambioForm
+from .forms import CustomAuthForm, CustomUserCreationForm, CustomUserUpdateForm, PasswordCambioForm, PasswordAdminSetForm
 
 
 def login_view(request):
@@ -100,3 +100,26 @@ def cambiar_password_view(request):
         messages.success(request, 'Contraseña actualizada correctamente.')
         return redirect('accounts:detail', pk=request.user.pk)
     return render(request, 'accounts/cambiar_password.html', {'form': form})
+
+
+@login_required
+def cambiar_password_usuario_view(request, pk):
+    if request.user.rol != 'admin':
+        messages.error(request, 'Solo un administrador puede cambiar contraseñas de otros usuarios.')
+        return redirect('dashboard:index')
+
+    usuario_objetivo = get_object_or_404(CustomUser, pk=pk)
+    form = PasswordAdminSetForm(user=usuario_objetivo, data=request.POST or None)
+    if request.method == 'POST' and form.is_valid():
+        form.save()
+        messages.success(request, f'Contraseña actualizada para {usuario_objetivo.get_full_name()}.')
+        return redirect('accounts:detail', pk=usuario_objetivo.pk)
+
+    return render(
+        request,
+        'accounts/cambiar_password_usuario.html',
+        {
+            'form': form,
+            'usuario_objetivo': usuario_objetivo,
+        },
+    )

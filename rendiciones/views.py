@@ -28,6 +28,7 @@ def _build_autocompletado_desde_ruta(ruta):
         'paradas': 0,
         'entregas': 0,
         'pagos': 0,
+        'advertencias_diferencia': [],  # Nueva: alertas OCR vs Manual
     }
 
     if not ruta:
@@ -44,6 +45,11 @@ def _build_autocompletado_desde_ruta(ruta):
 
     seen = {clave: set() for clave in sugeridos.keys()}
 
+
+    # --- Agrupar pagos manuales por factura y cliente para advertencias ---
+    pagos_por_factura = {}
+    ocr_por_factura = {}
+
     for parada in paradas:
         resumen['paradas'] += 1
         if not parada.entrega:
@@ -51,81 +57,103 @@ def _build_autocompletado_desde_ruta(ruta):
 
         entrega = parada.entrega
         cliente = entrega.cliente
-        numero_ref = str(entrega.pk)
+        numero_ref = (entrega.numero_factura_ref or '').strip() or str(entrega.pk)
+        monto_referencia = entrega.total_factura_ref or Decimal('0')
         resumen['entregas'] += 1
         pagos = list(entrega.pagos.all())
         tiene_pago_nula = any(pago.metodo == 'nula' for pago in pagos)
 
-        if entrega.estado in {'fallido', 'devuelto'} and not tiene_pago_nula:
-            key = (numero_ref, Decimal('0'))
-            if key not in seen['d']:
-                sugeridos['d'].append({
-                    'numero_factura': numero_ref,
-                    'monto': Decimal('0'),
-                })
-                seen['d'].add(key)
+        # Guardar OCR por factura (si hay)
+        ocr_por_factura[(numero_ref, cliente.nombre if cliente else '')] = monto_referencia
 
+        # Sumar pagos manuales por factura
+        for pago in pagos:
+            if pago.metodo == 'nula':
+                continue
+            monto = pago.monto or Decimal('0')
+            if monto <= 0:
+                continue
+            key = (numero_ref, cliente.nombre if cliente else '')
+            pagos_por_factura.setdefault(key, Decimal('0'))
+            pagos_por_factura[key] += monto
+
+        # --- Lógica de sugeridos (igual que antes) ---
         for pago in pagos:
             resumen['pagos'] += 1
             monto = pago.monto or Decimal('0')
+            monto_autocompletar = monto
 
             if pago.metodo == 'nula':
-                key = (numero_ref, monto)
-                if key not in seen['d']:
+                keyd = (numero_ref, monto_autocompletar)
+                if keyd not in seen['d']:
                     sugeridos['d'].append({
                         'numero_factura': numero_ref,
-                        'monto': monto,
+                        'monto': monto_autocompletar,
                     })
-                    seen['d'].add(key)
+                    seen['d'].add(keyd)
                 continue
 
             if monto <= 0:
                 continue
 
             if pago.metodo == 'cheque':
-                key = (numero_ref, cliente.nombre, monto)
-                if key not in seen['a']:
+                keya = (numero_ref, cliente.nombre, monto_autocompletar)
+                if keya not in seen['a']:
                     sugeridos['a'].append({
                         'numero_factura': numero_ref,
                         'nombre_cliente': cliente.nombre,
-                        'monto': monto,
+                        'monto': monto_autocompletar,
                         'banco': '',
                     })
-                    seen['a'].add(key)
+                    seen['a'].add(keya)
                 continue
 
             if pago.metodo == 'descuento':
                 motivo = (pago.observacion or 'Descuento en pago')[:200]
-                key = (numero_ref, motivo, monto)
-                if key not in seen['b']:
+                keyb = (numero_ref, motivo, monto_autocompletar)
+                if keyb not in seen['b']:
                     sugeridos['b'].append({
                         'numero_factura': numero_ref,
                         'motivo': motivo,
-                        'monto': monto,
+                        'monto': monto_autocompletar,
                     })
-                    seen['b'].add(key)
+                    seen['b'].add(keyb)
                 continue
 
             if pago.metodo == 'credito':
-                key = (numero_ref, cliente.nombre, monto)
-                if key not in seen['c']:
+                keyc = (numero_ref, cliente.nombre, monto_autocompletar)
+                if keyc not in seen['c']:
                     sugeridos['c'].append({
                         'numero_factura': numero_ref,
                         'autoriza_credito': cliente.nombre,
-                        'monto': monto,
+                        'monto': monto_autocompletar,
                     })
-                    seen['c'].add(key)
+                    seen['c'].add(keyc)
                 continue
 
             if pago.metodo == 'transferencia':
-                key = (numero_ref, monto)
-                if key not in seen['e']:
+                keye = (numero_ref, monto_autocompletar)
+                if keye not in seen['e']:
                     sugeridos['e'].append({
                         'numero_factura': numero_ref,
-                        'monto': monto,
+                        'monto': monto_autocompletar,
                     })
-                    seen['e'].add(key)
+                    seen['e'].add(keye)
                 continue
+
+    # --- Generar advertencias agrupadas por factura ---
+    resumen['advertencias_diferencia'] = []
+    for key, monto_manual in pagos_por_factura.items():
+        monto_ocr = ocr_por_factura.get(key, Decimal('0'))
+        if monto_ocr > 0 and monto_manual > 0 and monto_ocr != monto_manual:
+            numero_ref, cliente_nombre = key
+            resumen['advertencias_diferencia'].append({
+                'numero_factura': numero_ref,
+                'cliente': cliente_nombre or 'Desconocido',
+                'monto_ocr': monto_ocr,
+                'monto_manual': monto_manual,
+                'diferencia': monto_manual - monto_ocr,
+            })
 
     resumen['total_items'] = sum(len(items) for items in sugeridos.values())
     return sugeridos, resumen
@@ -147,6 +175,13 @@ def _autocompletar_rendicion_desde_entregas(rendicion):
     - Puede llamarse multiples veces sin crear duplicados
     """
     sugeridos, _ = _build_autocompletado_desde_ruta(rendicion.ruta)
+    tiene_manual = {
+        'a': rendicion.creditos_documentos.exists(),
+        'b': rendicion.devoluciones_parciales.exists(),
+        'c': rendicion.creditos_confianza.exists(),
+        'd': rendicion.facturas_nulas_detalle.exists(),
+        'e': rendicion.depositos_transferencias.exists(),
+    }
 
     def _existe_credito_documento(nombre_cliente, monto):
         # Si ya existe una línea para ese cliente y monto, no sugerir otra (sin importar el número de factura)
@@ -178,25 +213,30 @@ def _autocompletar_rendicion_desde_entregas(rendicion):
     def _existe_factura_nula(numero_factura):
         return rendicion.facturas_nulas_detalle.filter(numero_factura=numero_factura).exists()
 
-    for item in sugeridos['a']:
-        if not _existe_credito_documento(item['nombre_cliente'], item['monto']):
-            rendicion.creditos_documentos.create(**item)
+    if not tiene_manual['a']:
+        for item in sugeridos['a']:
+            if not _existe_credito_documento(item['nombre_cliente'], item['monto']):
+                rendicion.creditos_documentos.create(**item)
 
-    for item in sugeridos['b']:
-        if not _existe_devolucion_parcial(item['numero_factura'], item['motivo'], item['monto']):
-            rendicion.devoluciones_parciales.create(**item)
+    if not tiene_manual['b']:
+        for item in sugeridos['b']:
+            if not _existe_devolucion_parcial(item['numero_factura'], item['motivo'], item['monto']):
+                rendicion.devoluciones_parciales.create(**item)
 
-    for item in sugeridos['c']:
-        if not _existe_credito_confianza(item['numero_factura'], item['autoriza_credito'], item['monto']):
-            rendicion.creditos_confianza.create(**item)
+    if not tiene_manual['c']:
+        for item in sugeridos['c']:
+            if not _existe_credito_confianza(item['numero_factura'], item['autoriza_credito'], item['monto']):
+                rendicion.creditos_confianza.create(**item)
 
-    for item in sugeridos['d']:
-        if not _existe_factura_nula(item['numero_factura']):
-            rendicion.facturas_nulas_detalle.create(**item)
+    if not tiene_manual['d']:
+        for item in sugeridos['d']:
+            if not _existe_factura_nula(item['numero_factura']):
+                rendicion.facturas_nulas_detalle.create(**item)
 
-    for item in sugeridos['e']:
-        if not _existe_deposito_transferencia(item['numero_factura'], item['monto']):
-            rendicion.depositos_transferencias.create(**item)
+    if not tiene_manual['e']:
+        for item in sugeridos['e']:
+            if not _existe_deposito_transferencia(item['numero_factura'], item['monto']):
+                rendicion.depositos_transferencias.create(**item)
 
 
 def _write_rendiciones_log(filename, payload):
@@ -400,7 +440,7 @@ def rendiciones_resumen_excel(request):
 
     for rendicion in rendiciones:
         ws.append([
-            rendicion.fecha,
+            rendicion.fecha.strftime('%Y-%m-%d') if rendicion.fecha else '',
             float(rendicion.total_kilometros_recorridos or 0),
             rendicion.facturas_totales or 0,
             rendicion.facturas_entregadas or 0,
@@ -418,7 +458,6 @@ def rendiciones_resumen_excel(request):
         ])
 
     for row in ws.iter_rows(min_row=2, max_row=ws.max_row):
-        row[0].number_format = 'DD-MM-YYYY'
         row[1].number_format = '0.0'
         for idx in [5, 6, 7, 8, 9, 10, 11, 12]:
             row[idx].number_format = '#,##0'
@@ -627,6 +666,7 @@ def rendicion_create(request):
             for fs in formsets.values():
                 fs.instance = rendicion
                 fs.save()
+            _autocompletar_rendicion_desde_entregas(rendicion)
             rendicion.recalcular_totales()
             rendicion.save(update_fields=['menos_items', 'total_dinero_recibir'])
             messages.success(request, 'Rendición creada correctamente.')
