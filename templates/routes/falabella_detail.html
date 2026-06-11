@@ -54,16 +54,16 @@
 <div id="falabella-alert"></div>
 
 {% for p in paradas %}
-<div class="card stop-card shadow-sm mb-3" id="stop-card-{{ p.pk }}" data-parada-id="{{ p.pk }}">
+<div class="card stop-card shadow-sm mb-3" id="stop-card-{{ p.pk|unlocalize }}" data-parada-id="{{ p.pk|unlocalize }}">
   <div class="card-body py-2">
     <div class="d-flex justify-content-between align-items-start">
       <div class="pr-2 flex-grow-1">
-        <div class="stop-title" onclick="enfocarParada({{ p.pk }})">
+        <div class="stop-title" onclick="enfocarParada({{ p.pk|unlocalize }})">
           <span class="badge badge-info pill mr-1">Parada {{ p.orden }}</span>
           <strong>{{ p.entrega.cliente.nombre }}</strong>
         </div>
         {% with m=p.falabella_meta %}
-        <div class="small text-muted mt-1 parada-direccion" id="direccion-text-{{ p.pk }}"><i class="fas fa-map-marker-alt mr-1"></i>{{ m.direccion_original|default:p.entrega.cliente.direccion }}{% if m.localidad_original %}, {{ m.localidad_original }}{% endif %}</div>
+        <div class="small text-muted mt-1 parada-direccion" id="direccion-text-{{ p.pk|unlocalize }}"><i class="fas fa-map-marker-alt mr-1"></i>{{ m.direccion_original|default:p.entrega.cliente.direccion }}{% if m.localidad_original %}, {{ m.localidad_original }}{% endif %}</div>
         <div class="small text-muted"><i class="fas fa-phone mr-1"></i>{{ m.contacto_original|default:'Sin contacto' }}</div>
         <div class="small mt-1">
           {% if m %}
@@ -84,7 +84,7 @@
         </div>
 
         {% if m and m.estado_direccion == 'candidatos_disponibles' %}
-        <div class="mt-2 border-top pt-2" id="candidatos-{{ p.pk }}">
+        <div class="mt-2 border-top pt-2" id="candidatos-{{ p.pk|unlocalize }}">
           <div class="small text-muted mb-1"><i class="fas fa-map-pin mr-1 text-info"></i>Seleccionar ubicación:</div>
           {% for cand in p.ubicaciones_candidatas.all %}
           <div class="d-flex align-items-start mb-1 p-1 rounded candidato-item{% if cand.seleccionada %} seleccionada{% endif %}">
@@ -109,7 +109,7 @@
         {% endwith %}
       </div>
       <div class="text-right">
-        <button type="button" class="btn btn-sm {% if p.entrega.estado == 'entregado' %}btn-success{% else %}btn-outline-success{% endif %}" onclick="marcarEntregado({{ p.pk }})">
+        <button type="button" class="btn btn-sm {% if p.entrega.estado == 'entregado' %}btn-success{% else %}btn-outline-success{% endif %}" onclick="marcarEntregado({{ p.pk|unlocalize }})">
           <i class="fas fa-check mr-1"></i>{% if p.entrega.estado == 'entregado' %}Entregado{% else %}Marcar entregado{% endif %}
         </button>
       </div>
@@ -119,13 +119,13 @@
       <div class="small text-muted mb-2">Editar dirección y volver a buscar</div>
       <div class="form-row">
         <div class="form-group col-md-7 mb-2">
-          <input type="text" id="dir-{{ p.pk }}" class="form-control form-control-sm" value="{{ p.falabella_meta.direccion_original|default:p.entrega.cliente.direccion }}" placeholder="Dirección">
+          <input type="text" id="dir-{{ p.pk|unlocalize }}" class="form-control form-control-sm" value="{{ p.falabella_meta.direccion_original|default:p.entrega.cliente.direccion }}" placeholder="Dirección">
         </div>
         <div class="form-group col-md-3 mb-2">
-          <input type="text" id="loc-{{ p.pk }}" class="form-control form-control-sm" value="{{ p.falabella_meta.localidad_original|default:p.entrega.cliente.comuna }}" placeholder="Localidad">
+          <input type="text" id="loc-{{ p.pk|unlocalize }}" class="form-control form-control-sm" value="{{ p.falabella_meta.localidad_original|default:p.entrega.cliente.comuna }}" placeholder="Localidad">
         </div>
         <div class="form-group col-md-2 mb-2">
-          <button type="button" class="btn btn-sm btn-outline-info btn-block" onclick="guardarDireccion({{ p.pk }})">
+          <button type="button" class="btn btn-sm btn-outline-info btn-block" onclick="guardarDireccion({{ p.pk|unlocalize }})">
             <i class="fas fa-search-location mr-1"></i>Buscar
           </button>
         </div>
@@ -135,7 +135,7 @@
     <div class="mt-2">
       {% if p.entrega.cliente.tiene_coordenadas %}
       <a
-        id="waze-link-{{ p.pk }}"
+        id="waze-link-{{ p.pk|unlocalize }}"
         class="btn btn-sm btn-outline-dark"
         href="https://www.waze.com/ul?ll={{ p.entrega.cliente.latitud|unlocalize }},{{ p.entrega.cliente.longitud|unlocalize }}&navigate=yes"
         target="_blank"
@@ -144,7 +144,7 @@
         <i class="fas fa-location-arrow mr-1"></i>Abrir en Waze
       </a>
       <a
-        id="maps-search-link-{{ p.pk }}"
+        id="maps-search-link-{{ p.pk|unlocalize }}"
         class="btn btn-sm btn-outline-primary"
         href="{{ p.entrega.cliente.url_google_maps_busqueda }}"
         target="_blank"
@@ -153,7 +153,7 @@
         <i class="fas fa-map-marked-alt mr-1"></i>Buscar en Google Maps
       </a>
       <a
-        id="maps-coords-link-{{ p.pk }}"
+        id="maps-coords-link-{{ p.pk|unlocalize }}"
         class="btn btn-sm btn-outline-secondary"
         href="https://www.google.com/maps/dir/?api=1&destination={{ p.entrega.cliente.latitud|unlocalize }},{{ p.entrega.cliente.longitud|unlocalize }}&travelmode=driving"
         target="_blank"
@@ -162,9 +162,9 @@
         <i class="fas fa-crosshairs mr-1"></i>Coordenadas
       </a>
       {% else %}
-      <button type="button" class="btn btn-sm btn-outline-secondary" disabled id="waze-link-{{ p.pk }}">Waze no disponible</button>
+      <button type="button" class="btn btn-sm btn-outline-secondary" disabled id="waze-link-{{ p.pk|unlocalize }}">Waze no disponible</button>
       <a
-        id="maps-search-link-{{ p.pk }}"
+        id="maps-search-link-{{ p.pk|unlocalize }}"
         class="btn btn-sm btn-outline-primary"
         href="{{ p.entrega.cliente.url_google_maps_busqueda }}"
         target="_blank"
@@ -184,12 +184,12 @@
 {% block extra_js %}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-var RUTA_ID = {{ ruta.pk }};
+var RUTA_ID = {{ ruta.pk|unlocalize }};
 var PARADAS = [
 {% for p in paradas %}
   {
-    id: {{ p.pk }},
-    orden: {{ p.orden }},
+    id: {{ p.pk|unlocalize }},
+    orden: {{ p.orden|unlocalize }},
     nombre: '{{ p.entrega.cliente.nombre|escapejs }}',
     direccion: '{{ p.falabella_meta.direccion_original|default:p.entrega.cliente.direccion|escapejs }}',
     localidad: '{{ p.falabella_meta.localidad_original|default:p.entrega.cliente.comuna|escapejs }}',
