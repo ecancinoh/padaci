@@ -340,6 +340,8 @@ class ParadaFalabellaMeta(models.Model):
         related_name='falabella_meta',
         verbose_name='Parada',
     )
+    direccion_importada = models.TextField(blank=True, default='', verbose_name='Direccion importada de Falabella')
+    localidad_importada = models.CharField(max_length=140, blank=True, default='', verbose_name='Localidad importada de Falabella')
     direccion_original = models.TextField(blank=True, default='', verbose_name='Direccion original')
     localidad_original = models.CharField(max_length=140, blank=True, default='', verbose_name='Localidad original')
     contacto_original = models.CharField(max_length=80, blank=True, default='', verbose_name='Contacto original')

@@ -8,6 +8,7 @@ urlpatterns = [
     path('falabella/nueva/', views.ruta_falabella_import, name='falabella_import'),
     path('falabella/<int:pk>/', views.ruta_falabella_detail, name='falabella_detail'),
     path('falabella/<int:pk>/reoptimizar/', views.falabella_reoptimizar, name='falabella_reoptimizar'),
+    path('falabella/<int:pk>/reordenar/', views.falabella_reordenar_paradas, name='falabella_reordenar'),
     path('falabella/<int:pk>/parada/<int:parada_id>/entregado/', views.falabella_marcar_entregado, name='falabella_marcar_entregado'),
     path('falabella/<int:pk>/parada/<int:parada_id>/candidato/<int:candidato_id>/seleccionar/', views.falabella_seleccionar_candidato, name='falabella_select_candidate'),
     path('falabella/<int:pk>/parada/<int:parada_id>/direccion/', views.falabella_actualizar_direccion, name='falabella_update_address'),

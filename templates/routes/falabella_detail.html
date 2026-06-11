@@ -7,12 +7,18 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <style>
   #mapFalabella { height: 480px; border-radius: .35rem; }
-  .stop-card { border-left: 4px solid #36b9cc; }
-  .stop-card-selected { border-left-color: #f0ad4e; box-shadow: 0 0 0 2px rgba(240,173,78,.18); }
+  #paradas-list .stop-card { border-left: 4px solid #36b9cc; touch-action: none; }
+  .stop-card-selected { border-left-color: #f0ad4e !important; box-shadow: 0 0 0 2px rgba(240,173,78,.18); }
   .stop-title { cursor: pointer; }
   .pill { font-size: .72rem; }
+  .drag-handle { cursor: grab; color: #b7b9cc; padding: 2px 6px; }
+  .drag-handle:active { cursor: grabbing; }
+  .sortable-ghost { opacity: .45; background: #e3e6f0 !important; }
+  .sortable-drag { box-shadow: 0 6px 18px rgba(0,0,0,.22) !important; }
   .candidato-item { background: #f8f9fc; border: 1px solid transparent; }
   .candidato-item.seleccionada { background: #e8f7f0; border-color: #1cc88a; }
+  .dir-original { font-size: .82rem; }
+  .dir-editada { font-size: .82rem; }
 </style>
 {% endblock %}
 
@@ -53,18 +59,41 @@
 
 <div id="falabella-alert"></div>
 
+<div class="small text-muted mb-2 pl-1"><i class="fas fa-grip-vertical mr-1"></i>Arrastra cada parada para reordenar manualmente</div>
+
+<div id="paradas-list">
 {% for p in paradas %}
 <div class="card stop-card shadow-sm mb-3" id="stop-card-{{ p.pk|unlocalize }}" data-parada-id="{{ p.pk|unlocalize }}">
   <div class="card-body py-2">
     <div class="d-flex justify-content-between align-items-start">
-      <div class="pr-2 flex-grow-1">
+
+      <div class="drag-handle d-flex align-items-center pt-1" title="Arrastrar para reordenar">
+        <i class="fas fa-grip-vertical fa-lg"></i>
+      </div>
+
+      <div class="px-2 flex-grow-1">
         <div class="stop-title" onclick="enfocarParada({{ p.pk|unlocalize }})">
-          <span class="badge badge-info pill mr-1">Parada {{ p.orden }}</span>
+          <span class="badge badge-info pill mr-1" id="orden-badge-{{ p.pk|unlocalize }}">Parada {{ p.orden }}</span>
           <strong>{{ p.entrega.cliente.nombre }}</strong>
         </div>
+
         {% with m=p.falabella_meta %}
-        <div class="small text-muted mt-1 parada-direccion" id="direccion-text-{{ p.pk|unlocalize }}"><i class="fas fa-map-marker-alt mr-1"></i>{{ m.direccion_original|default:p.entrega.cliente.direccion }}{% if m.localidad_original %}, {{ m.localidad_original }}{% endif %}</div>
+        <!-- Dirección original Falabella (inmutable, del Excel) -->
+        <div class="dir-original text-muted mt-1">
+          <i class="fas fa-file-import mr-1"></i>
+          <span class="text-secondary font-weight-bold">Falabella:</span>
+          {{ m.direccion_importada|default:m.direccion_original }}{% if m.localidad_importada|default:m.localidad_original %}, {{ m.localidad_importada|default:m.localidad_original }}{% endif %}
+        </div>
+
+        <!-- Dirección editada/geocodificada (se actualiza con JS al presionar Buscar) -->
+        <div class="dir-editada mt-1" id="dir-editada-wrap-{{ p.pk|unlocalize }}"{% if not m.direccion_original or m.direccion_original == m.direccion_importada %} style="display:none"{% endif %}>
+          <i class="fas fa-map-marker-alt mr-1 text-info"></i>
+          <span class="text-secondary font-weight-bold">Editada:</span>
+          <span id="dir-editada-text-{{ p.pk|unlocalize }}">{{ m.direccion_original }}{% if m.localidad_original %}, {{ m.localidad_original }}{% endif %}</span>
+        </div>
+
         <div class="small text-muted"><i class="fas fa-phone mr-1"></i>{{ m.contacto_original|default:'Sin contacto' }}</div>
+
         <div class="small mt-1">
           {% if m %}
             {% if m.estado_direccion == 'confirmada_manual' %}
@@ -108,15 +137,16 @@
         {% endif %}
         {% endwith %}
       </div>
-      <div class="text-right">
+
+      <div class="text-right flex-shrink-0">
         <button type="button" class="btn btn-sm {% if p.entrega.estado == 'entregado' %}btn-success{% else %}btn-outline-success{% endif %}" onclick="marcarEntregado({{ p.pk|unlocalize }})">
-          <i class="fas fa-check mr-1"></i>{% if p.entrega.estado == 'entregado' %}Entregado{% else %}Marcar entregado{% endif %}
+          <i class="fas fa-check mr-1"></i>{% if p.entrega.estado == 'entregado' %}Entregado{% else %}Marcar{% endif %}
         </button>
       </div>
     </div>
 
     <div class="mt-3 border-top pt-2">
-      <div class="small text-muted mb-2">Editar dirección y volver a buscar</div>
+      <div class="small text-muted mb-2">Editar dirección y buscar geocodificación</div>
       <div class="form-row">
         <div class="form-group col-md-7 mb-2">
           <input type="text" id="dir-{{ p.pk|unlocalize }}" class="form-control form-control-sm" value="{{ p.falabella_meta.direccion_original|default:p.entrega.cliente.direccion }}" placeholder="Dirección">
@@ -134,43 +164,25 @@
 
     <div class="mt-2">
       {% if p.entrega.cliente.tiene_coordenadas %}
-      <a
-        id="waze-link-{{ p.pk|unlocalize }}"
-        class="btn btn-sm btn-outline-dark"
-        href="https://www.waze.com/ul?ll={{ p.entrega.cliente.latitud|unlocalize }},{{ p.entrega.cliente.longitud|unlocalize }}&navigate=yes"
-        target="_blank"
-        rel="noopener"
-      >
-        <i class="fas fa-location-arrow mr-1"></i>Abrir en Waze
+      <a id="waze-link-{{ p.pk|unlocalize }}" class="btn btn-sm btn-outline-dark"
+         href="https://www.waze.com/ul?ll={{ p.entrega.cliente.latitud|unlocalize }},{{ p.entrega.cliente.longitud|unlocalize }}&navigate=yes"
+         target="_blank" rel="noopener">
+        <i class="fas fa-location-arrow mr-1"></i>Waze
       </a>
-      <a
-        id="maps-search-link-{{ p.pk|unlocalize }}"
-        class="btn btn-sm btn-outline-primary"
-        href="{{ p.entrega.cliente.url_google_maps_busqueda }}"
-        target="_blank"
-        rel="noopener"
-      >
-        <i class="fas fa-map-marked-alt mr-1"></i>Buscar en Google Maps
+      <a id="maps-search-link-{{ p.pk|unlocalize }}" class="btn btn-sm btn-outline-primary"
+         href="{{ p.entrega.cliente.url_google_maps_busqueda }}" target="_blank" rel="noopener">
+        <i class="fas fa-map-marked-alt mr-1"></i>Google Maps
       </a>
-      <a
-        id="maps-coords-link-{{ p.pk|unlocalize }}"
-        class="btn btn-sm btn-outline-secondary"
-        href="https://www.google.com/maps/dir/?api=1&destination={{ p.entrega.cliente.latitud|unlocalize }},{{ p.entrega.cliente.longitud|unlocalize }}&travelmode=driving"
-        target="_blank"
-        rel="noopener"
-      >
+      <a id="maps-coords-link-{{ p.pk|unlocalize }}" class="btn btn-sm btn-outline-secondary"
+         href="https://www.google.com/maps/dir/?api=1&destination={{ p.entrega.cliente.latitud|unlocalize }},{{ p.entrega.cliente.longitud|unlocalize }}&travelmode=driving"
+         target="_blank" rel="noopener">
         <i class="fas fa-crosshairs mr-1"></i>Coordenadas
       </a>
       {% else %}
       <button type="button" class="btn btn-sm btn-outline-secondary" disabled id="waze-link-{{ p.pk|unlocalize }}">Waze no disponible</button>
-      <a
-        id="maps-search-link-{{ p.pk|unlocalize }}"
-        class="btn btn-sm btn-outline-primary"
-        href="{{ p.entrega.cliente.url_google_maps_busqueda }}"
-        target="_blank"
-        rel="noopener"
-      >
-        <i class="fas fa-map-marked-alt mr-1"></i>Buscar en Google Maps
+      <a id="maps-search-link-{{ p.pk|unlocalize }}" class="btn btn-sm btn-outline-primary"
+         href="{{ p.entrega.cliente.url_google_maps_busqueda }}" target="_blank" rel="noopener">
+        <i class="fas fa-map-marked-alt mr-1"></i>Google Maps
       </a>
       {% endif %}
     </div>
@@ -179,12 +191,15 @@
 {% empty %}
 <div class="alert alert-warning">No hay paradas para esta ruta.</div>
 {% endfor %}
+</div><!-- /#paradas-list -->
 {% endblock %}
 
 {% block extra_js %}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 <script>
 var RUTA_ID = {{ ruta.pk|unlocalize }};
+var REORDENAR_URL = '{% url "routes:falabella_reordenar" ruta.pk %}';
 var PARADAS = [
 {% for p in paradas %}
   {
@@ -211,7 +226,6 @@ function getCookie(name) {
   if (parts.length === 2) return parts.pop().split(';').shift();
   return '';
 }
-
 var CSRF = getCookie('csrftoken') || '{{ csrf_token }}';
 
 function showFalabellaAlert(type, text) {
@@ -226,9 +240,7 @@ function makeStopIcon(orden, estado) {
   return L.divIcon({
     className: '',
     html: '<div style="background:' + color + ';color:#fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;border:2px solid rgba(255,255,255,.9);box-shadow:0 2px 5px rgba(0,0,0,.35);">' + orden + '</div>',
-    iconSize: [28, 28],
-    iconAnchor: [14, 14],
-    popupAnchor: [0, -16]
+    iconSize: [28, 28], iconAnchor: [14, 14], popupAnchor: [0, -16]
   });
 }
 
@@ -238,12 +250,7 @@ function updatePolyline() {
     .filter(function(p) { return p.lat !== null && p.lon !== null; })
     .map(function(p) { return [p.lat, p.lon]; });
   if (coords.length >= 2) {
-    routePolyline = L.polyline(coords, {
-      color: '#36b9cc',
-      weight: 3,
-      dashArray: '8, 4',
-      opacity: 0.8
-    }).addTo(map);
+    routePolyline = L.polyline(coords, {color: '#36b9cc', weight: 3, dashArray: '8,4', opacity: 0.8}).addTo(map);
   }
 }
 
@@ -257,10 +264,7 @@ function buildGoogleMapsRouteUrl() {
 
 function abrirRutaGoogleMaps() {
   var url = buildGoogleMapsRouteUrl();
-  if (!url) {
-    showFalabellaAlert('warning', 'No hay paradas con coordenadas confirmadas para trazar la ruta.');
-    return;
-  }
+  if (!url) { showFalabellaAlert('warning', 'No hay paradas con coordenadas confirmadas para trazar la ruta.'); return; }
   window.open(url, '_blank', 'noopener');
 }
 
@@ -273,49 +277,38 @@ function buildGoogleMapsSearchUrl(direccion, localidad) {
 function updateStopNavigationLinks(paradaId, data) {
   var searchLink = document.getElementById('maps-search-link-' + paradaId);
   if (searchLink) searchLink.href = data.google_maps_busqueda || searchLink.href;
-
   var coordsLink = document.getElementById('maps-coords-link-' + paradaId);
-  if (coordsLink && data.google_maps_coordenadas) {
-    coordsLink.href = data.google_maps_coordenadas;
-    coordsLink.style.display = '';
-  }
-
+  if (coordsLink && data.google_maps_coordenadas) { coordsLink.href = data.google_maps_coordenadas; }
   var wazeLink = document.getElementById('waze-link-' + paradaId);
   if (wazeLink && data.waze) {
     if (wazeLink.tagName === 'BUTTON') {
-      var replacement = document.createElement('a');
-      replacement.id = wazeLink.id;
-      replacement.className = 'btn btn-sm btn-outline-dark';
-      replacement.href = data.waze;
-      replacement.target = '_blank';
-      replacement.rel = 'noopener';
-      replacement.innerHTML = '<i class="fas fa-location-arrow mr-1"></i>Abrir en Waze';
-      wazeLink.parentNode.replaceChild(replacement, wazeLink);
-    } else {
-      wazeLink.href = data.waze;
-    }
+      var a = document.createElement('a');
+      a.id = wazeLink.id; a.className = 'btn btn-sm btn-outline-dark';
+      a.href = data.waze; a.target = '_blank'; a.rel = 'noopener';
+      a.innerHTML = '<i class="fas fa-location-arrow mr-1"></i>Waze';
+      wazeLink.parentNode.replaceChild(a, wazeLink);
+    } else { wazeLink.href = data.waze; }
   }
-
-  var direccionText = document.getElementById('direccion-text-' + paradaId);
-  if (direccionText) direccionText.innerHTML = '<i class="fas fa-map-marker-alt mr-1"></i>' + data.direccion_label;
+  // Mostrar fila "Editada"
+  var wrap = document.getElementById('dir-editada-wrap-' + paradaId);
+  var textEl = document.getElementById('dir-editada-text-' + paradaId);
+  if (wrap && textEl) {
+    textEl.textContent = data.direccion_label;
+    wrap.style.display = '';
+  }
 }
 
 function upsertMarker(paradaId, lat, lon) {
   var parada = null;
-  for (var i = 0; i < PARADAS.length; i++) {
-    if (PARADAS[i].id === paradaId) { parada = PARADAS[i]; break; }
-  }
+  for (var i = 0; i < PARADAS.length; i++) { if (PARADAS[i].id === paradaId) { parada = PARADAS[i]; break; } }
   if (!parada) return;
   var marker = paradaMarkers[paradaId];
   if (!marker) {
     marker = L.marker([lat, lon], {icon: makeStopIcon(parada.orden, parada.estado)})
-      .addTo(map)
-      .bindPopup('Parada ' + parada.orden + ' – ' + parada.nombre);
+      .addTo(map).bindPopup('Parada ' + parada.orden + ' – ' + parada.nombre);
     marker.on('click', function() { enfocarParada(parada.id); });
     paradaMarkers[paradaId] = marker;
-  } else {
-    marker.setLatLng([lat, lon]);
-  }
+  } else { marker.setLatLng([lat, lon]); }
 }
 
 function removeMarker(paradaId) {
@@ -330,21 +323,15 @@ function setSelectedCard(paradaId) {
   }
   paradaFocusId = paradaId;
   var card = document.getElementById('stop-card-' + paradaId);
-  if (card) {
-    card.classList.add('stop-card-selected');
-    card.scrollIntoView({behavior: 'smooth', block: 'center'});
-  }
+  if (card) { card.classList.add('stop-card-selected'); card.scrollIntoView({behavior: 'smooth', block: 'center'}); }
 }
 
 function enfocarParada(paradaId) {
   var parada = null;
-  for (var i = 0; i < PARADAS.length; i++) {
-    if (PARADAS[i].id === paradaId) { parada = PARADAS[i]; break; }
-  }
+  for (var i = 0; i < PARADAS.length; i++) { if (PARADAS[i].id === paradaId) { parada = PARADAS[i]; break; } }
   if (!parada || parada.lat === null || parada.lon === null) {
     showFalabellaAlert('warning', 'Esa parada aún no tiene coordenadas confirmadas.');
-    setSelectedCard(paradaId);
-    return;
+    setSelectedCard(paradaId); return;
   }
   setSelectedCard(paradaId);
   if (paradaHighlights) map.removeLayer(paradaHighlights);
@@ -358,8 +345,7 @@ function enfocarParada(paradaId) {
 
 function postJson(url, payload) {
   return fetch(url, {
-    method: 'POST',
-    credentials: 'same-origin',
+    method: 'POST', credentials: 'same-origin',
     headers: {'Content-Type': 'application/json', 'X-CSRFToken': CSRF, 'X-Requested-With': 'XMLHttpRequest'},
     body: JSON.stringify(payload || {})
   }).then(function(r) {
@@ -376,14 +362,13 @@ function marcarEntregado(paradaId) {
   var url = '{% url "routes:falabella_marcar_entregado" ruta.pk 0 %}'.replace('/0/entregado/', '/' + paradaId + '/entregado/');
   postJson(url, {}).then(function(data) {
     if (data.error) { showFalabellaAlert('danger', data.error); return; }
-    showFalabellaAlert('success', 'Estado actualizado a: ' + data.estado_display + '. Recargando...');
+    showFalabellaAlert('success', 'Estado actualizado: ' + data.estado_display + '. Recargando...');
     window.location.reload();
   }).catch(function() { showFalabellaAlert('danger', 'No se pudo actualizar la entrega.'); });
 }
 
 function reoptimizarFalabella() {
-  var url = '{% url "routes:falabella_reoptimizar" ruta.pk %}';
-  postJson(url, {}).then(function(data) {
+  postJson('{% url "routes:falabella_reoptimizar" ruta.pk %}', {}).then(function(data) {
     if (data.error) { showFalabellaAlert('danger', data.error); return; }
     showFalabellaAlert('success', 'Ruta reoptimizada. Geocodificadas: ' + data.con_coords + '. Pendientes: ' + data.pendientes + '. Recargando...');
     window.location.reload();
@@ -408,16 +393,11 @@ function guardarDireccion(paradaId) {
       direccion_label: direccionLabel
     });
     var paradaObj = null;
-    for (var i = 0; i < PARADAS.length; i++) {
-      if (PARADAS[i].id === paradaId) { paradaObj = PARADAS[i]; break; }
-    }
+    for (var i = 0; i < PARADAS.length; i++) { if (PARADAS[i].id === paradaId) { paradaObj = PARADAS[i]; break; } }
     if (paradaObj) {
-      paradaObj.direccion = direccion;
-      paradaObj.localidad = localidad;
-      if (data.latitud !== null && data.latitud !== undefined && data.longitud !== null && data.longitud !== undefined) {
-        paradaObj.lat = data.latitud;
-        paradaObj.lon = data.longitud;
-        paradaObj.estado = 'confirmada_manual';
+      paradaObj.direccion = direccion; paradaObj.localidad = localidad;
+      if (data.latitud != null && data.longitud != null) {
+        paradaObj.lat = data.latitud; paradaObj.lon = data.longitud; paradaObj.estado = 'confirmada_manual';
         upsertMarker(paradaId, data.latitud, data.longitud);
         updatePolyline();
         if (paradaHighlights) map.removeLayer(paradaHighlights);
@@ -425,10 +405,8 @@ function guardarDireccion(paradaId) {
           radius: 14, color: '#f0ad4e', weight: 3, fillColor: '#f0ad4e', fillOpacity: 0.22
         }).addTo(map);
       } else {
-        paradaObj.lat = null;
-        paradaObj.lon = null;
-        removeMarker(paradaId);
-        updatePolyline();
+        paradaObj.lat = null; paradaObj.lon = null;
+        removeMarker(paradaId); updatePolyline();
         if (paradaHighlights) { map.removeLayer(paradaHighlights); paradaHighlights = null; }
       }
     }
@@ -449,6 +427,26 @@ function seleccionarCandidato(url) {
   }).catch(function() { showFalabellaAlert('danger', 'No se pudo actualizar la ubicación.'); });
 }
 
+function saveNewOrder(paradaIds) {
+  postJson(REORDENAR_URL, {orden: paradaIds}).then(function(data) {
+    if (data.error) { showFalabellaAlert('danger', 'Error al guardar el orden: ' + data.error); return; }
+    paradaIds.forEach(function(pid, idx) {
+      var newOrden = idx + 1;
+      var p = PARADAS.find(function(x) { return x.id === pid; });
+      if (p) {
+        p.orden = newOrden;
+        var marker = paradaMarkers[pid];
+        if (marker) { marker.setIcon(makeStopIcon(newOrden, p.estado)); marker.setPopupContent('Parada ' + newOrden + ' – ' + p.nombre); }
+        var badge = document.getElementById('orden-badge-' + pid);
+        if (badge) badge.textContent = 'Parada ' + newOrden;
+      }
+    });
+    updatePolyline();
+    showFalabellaAlert('success', 'Orden guardado.');
+  }).catch(function() { showFalabellaAlert('danger', 'Error al guardar el orden.'); });
+}
+
+/* ——— Mapa ——— */
 var map = L.map('mapFalabella').setView([-34.20, -70.80], 10);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {attribution: '© OpenStreetMap'}).addTo(map);
 
@@ -456,21 +454,34 @@ var bounds = [];
 PARADAS.forEach(function(parada) {
   if (parada.lat === null || parada.lon === null) return;
   var marker = L.marker([parada.lat, parada.lon], {icon: makeStopIcon(parada.orden, parada.estado)})
-    .addTo(map)
-    .bindPopup('Parada ' + parada.orden + ' – ' + parada.nombre);
+    .addTo(map).bindPopup('Parada ' + parada.orden + ' – ' + parada.nombre);
   paradaMarkers[parada.id] = marker;
   marker.on('click', function() { enfocarParada(parada.id); });
   bounds.push([parada.lat, parada.lon]);
 });
-
 if (bounds.length) map.fitBounds(bounds, {padding: [24, 24]});
 updatePolyline();
 
+/* ——— Click en card (fuera de botones/links) ——— */
 document.querySelectorAll('[data-parada-id]').forEach(function(card) {
   card.addEventListener('click', function(event) {
-    var paradaId = parseInt(card.getAttribute('data-parada-id'), 10);
-    if (!event.target.closest('button') && !event.target.closest('a')) enfocarParada(paradaId);
+    if (!event.target.closest('button') && !event.target.closest('a')) {
+      enfocarParada(parseInt(card.getAttribute('data-parada-id'), 10));
+    }
   });
+});
+
+/* ——— Drag-to-reorder con Sortable.js ——— */
+Sortable.create(document.getElementById('paradas-list'), {
+  handle: '.drag-handle',
+  animation: 200,
+  ghostClass: 'sortable-ghost',
+  dragClass: 'sortable-drag',
+  onEnd: function() {
+    var cards = document.querySelectorAll('#paradas-list [data-parada-id]');
+    var newOrder = Array.from(cards).map(function(c) { return parseInt(c.getAttribute('data-parada-id'), 10); });
+    saveNewOrder(newOrder);
+  }
 });
 </script>
 {% endblock %}

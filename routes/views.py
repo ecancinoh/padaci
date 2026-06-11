@@ -1331,6 +1331,8 @@ def ruta_falabella_import(request):
                                     ParadaFalabellaMeta.objects.update_or_create(
                                         parada=parada,
                                         defaults={
+                                            'direccion_importada': row.get('direccion', ''),
+                                            'localidad_importada': row.get('localidad', ''),
                                             'direccion_original': row.get('direccion', ''),
                                             'localidad_original': row.get('localidad', ''),
                                             'contacto_original': '',
@@ -1546,6 +1548,34 @@ def falabella_reoptimizar(request, pk):
     ruta = get_object_or_404(RutaDia, pk=pk, modalidad='falabella')
     con_coords, pendientes = _falabella_optimizar_con_anclas(ruta)
     return JsonResponse({'ok': True, 'con_coords': con_coords, 'pendientes': pendientes})
+
+
+@login_required
+def falabella_reordenar_paradas(request, pk):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Método no permitido.'}, status=405)
+    ruta = get_object_or_404(RutaDia, pk=pk, modalidad='falabella')
+    try:
+        payload = json.loads(request.body.decode('utf-8') or '{}')
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return JsonResponse({'error': 'Solicitud inválida.'}, status=400)
+
+    orden_ids = [int(x) for x in payload.get('orden', [])]
+    if not orden_ids:
+        return JsonResponse({'error': 'No se recibió el orden.'}, status=400)
+
+    paradas_ruta = set(ruta.paradas.values_list('pk', flat=True))
+    if set(orden_ids) != paradas_ruta:
+        return JsonResponse({'error': 'Las paradas no coinciden con la ruta.'}, status=400)
+
+    with transaction.atomic():
+        offset = len(orden_ids) + 100
+        for tmp_idx, parada_id in enumerate(orden_ids, start=1):
+            ParadaRuta.objects.filter(pk=parada_id, ruta=ruta).update(orden=offset + tmp_idx)
+        for new_idx, parada_id in enumerate(orden_ids, start=1):
+            ParadaRuta.objects.filter(pk=parada_id, ruta=ruta).update(orden=new_idx)
+
+    return JsonResponse({'ok': True})
 
 
 @login_required
