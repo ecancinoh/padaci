@@ -187,14 +187,24 @@ def _falabella_payload_from_session(request, token):
     return request.session.get(f'{FALABELLA_SESSION_PREFIX}{token}')
 
 
-def _geocode_nominatim(query, limit=4):
+def _geocode_nominatim(query=None, limit=4, *, street=None, city=None, state=None):
     params = {
-        'q': query,
         'format': 'jsonv2',
         'addressdetails': 1,
         'limit': limit,
         'countrycodes': 'cl',
     }
+    if street or city or state:
+        if street:
+            params['street'] = street
+        if city:
+            params['city'] = city
+        if state:
+            params['state'] = state
+        params['country'] = 'Chile'
+    else:
+        params['q'] = query or ''
+
     url = 'https://nominatim.openstreetmap.org/search?' + urlencode(params)
     req = Request(url, headers={'User-Agent': 'PADACI/1.0 (Rutas Falabella)'})
     try:
@@ -238,8 +248,15 @@ def _street_name_without_number(text):
 
 
 def _geocode_free_address(direccion, localidad):
-    query = ', '.join(part for part in [direccion, localidad, "Region de O'Higgins", 'Chile'] if part)
-    candidatos = _geocode_nominatim(query, limit=10)
+    candidatos = _geocode_nominatim(
+        limit=10,
+        street=direccion or None,
+        city=localidad or None,
+        state="Region de O'Higgins",
+    )
+    if not candidatos:
+        query = ', '.join(part for part in [direccion, localidad, "Region de O'Higgins", 'Chile'] if part)
+        candidatos = _geocode_nominatim(query, limit=10)
     if not candidatos:
         return None
 
@@ -310,14 +327,15 @@ def _falabella_regenerar_candidatos(parada, direccion, localidad):
 
     ParadaUbicacionCandidata.objects.filter(parada=parada).delete()
 
-    query_parts = [
-        direccion or '',
-        localidad or '',
-        "Region de O'Higgins",
-        'Chile',
-    ]
-    query = ', '.join(part for part in query_parts if part)
-    candidatos = _geocode_nominatim(query, limit=4)
+    candidatos = _geocode_nominatim(
+        limit=4,
+        street=direccion or None,
+        city=localidad or None,
+        state="Region de O'Higgins",
+    )
+    if not candidatos:
+        query = ', '.join(part for part in [direccion or '', localidad or '', "Region de O'Higgins", 'Chile'] if part)
+        candidatos = _geocode_nominatim(query, limit=4)
 
     if not candidatos:
         meta.estado_direccion = 'requiere_llamada_cliente'
@@ -1375,7 +1393,12 @@ def ruta_falabella_detail(request, pk):
         pk=pk,
         modalidad='falabella',
     )
-    paradas = ruta.paradas.select_related('entrega__cliente').order_by('orden')
+    paradas = ruta.paradas.select_related(
+        'entrega__cliente',
+        'falabella_meta',
+    ).prefetch_related(
+        'ubicaciones_candidatas',
+    ).order_by('orden')
     return render(
         request,
         'routes/falabella_detail.html',

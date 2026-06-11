@@ -6,11 +6,13 @@
 {% block extra_css %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <style>
-  #mapFalabella { height: 360px; border-radius: .35rem; }
+  #mapFalabella { height: 480px; border-radius: .35rem; }
   .stop-card { border-left: 4px solid #36b9cc; }
   .stop-card-selected { border-left-color: #f0ad4e; box-shadow: 0 0 0 2px rgba(240,173,78,.18); }
   .stop-title { cursor: pointer; }
   .pill { font-size: .72rem; }
+  .candidato-item { background: #f8f9fc; border: 1px solid transparent; }
+  .candidato-item.seleccionada { background: #e8f7f0; border-color: #1cc88a; }
 </style>
 {% endblock %}
 
@@ -18,6 +20,7 @@
 <div class="d-sm-flex align-items-center justify-content-between mb-4">
   <h1 class="h4 mb-0 text-gray-800"><i class="fas fa-truck-loading text-info mr-2"></i>Ruta Falabella {{ ruta.fecha }}</h1>
   <div class="d-flex flex-wrap" style="gap:.35rem;">
+    <button type="button" class="btn btn-outline-success btn-sm" onclick="abrirRutaGoogleMaps()"><i class="fas fa-route mr-1"></i>Ver ruta en Google Maps</button>
     <button type="button" class="btn btn-outline-info btn-sm" onclick="reoptimizarFalabella()"><i class="fas fa-sync-alt mr-1"></i>Reoptimizar</button>
     <a href="{% url 'routes:list' %}" class="btn btn-secondary btn-sm"><i class="fas fa-arrow-left mr-1"></i>Volver</a>
   </div>
@@ -37,7 +40,14 @@
 </div>
 
 <div class="card shadow mb-4">
-  <div class="card-header py-2"><strong>Mapa de paradas</strong></div>
+  <div class="card-header py-2 d-flex justify-content-between align-items-center">
+    <strong>Mapa de paradas</strong>
+    <small class="text-muted">
+      <span class="mr-2"><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#1cc88a;"></span> Confirmada</span>
+      <span class="mr-2"><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#f6c23e;"></span> Candidatos</span>
+      <span><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#36b9cc;"></span> Sin estado</span>
+    </small>
+  </div>
   <div class="card-body p-0"><div id="mapFalabella"></div></div>
 </div>
 
@@ -56,8 +66,46 @@
         <div class="small text-muted mt-1 parada-direccion" id="direccion-text-{{ p.pk }}"><i class="fas fa-map-marker-alt mr-1"></i>{{ m.direccion_original|default:p.entrega.cliente.direccion }}{% if m.localidad_original %}, {{ m.localidad_original }}{% endif %}</div>
         <div class="small text-muted"><i class="fas fa-phone mr-1"></i>{{ m.contacto_original|default:'Sin contacto' }}</div>
         <div class="small mt-1">
-          <span class="badge badge-success">Dirección confirmada para Google Maps</span>
+          {% if m %}
+            {% if m.estado_direccion == 'confirmada_manual' %}
+              <span class="badge badge-success">Dirección confirmada</span>
+            {% elif m.estado_direccion == 'candidatos_disponibles' %}
+              <span class="badge badge-info">Candidatos disponibles</span>
+            {% elif m.estado_direccion == 'requiere_llamada_cliente' %}
+              <span class="badge badge-danger">Sin coordenadas – verificar dirección</span>
+            {% elif m.estado_direccion == 'pendiente_busqueda' %}
+              <span class="badge badge-warning text-dark">Pendiente geocodificación</span>
+            {% else %}
+              <span class="badge badge-secondary">{{ m.estado_direccion }}</span>
+            {% endif %}
+          {% else %}
+            <span class="badge badge-warning text-dark">Pendiente geocodificación</span>
+          {% endif %}
         </div>
+
+        {% if m and m.estado_direccion == 'candidatos_disponibles' %}
+        <div class="mt-2 border-top pt-2" id="candidatos-{{ p.pk }}">
+          <div class="small text-muted mb-1"><i class="fas fa-map-pin mr-1 text-info"></i>Seleccionar ubicación:</div>
+          {% for cand in p.ubicaciones_candidatas.all %}
+          <div class="d-flex align-items-start mb-1 p-1 rounded candidato-item{% if cand.seleccionada %} seleccionada{% endif %}">
+            <div class="flex-grow-1 small">
+              <span class="font-weight-bold">{{ cand.etiqueta|truncatechars:60 }}</span><br>
+              <span class="text-muted">{{ cand.direccion_formateada|truncatechars:80 }}</span>
+            </div>
+            {% if cand.seleccionada %}
+              <span class="badge badge-success ml-2 flex-shrink-0" style="line-height:1.8">Actual</span>
+            {% else %}
+              <button type="button" class="btn btn-sm btn-outline-info ml-2 flex-shrink-0 py-0"
+                      onclick="seleccionarCandidato('{% url "routes:falabella_select_candidate" ruta.pk p.pk cand.pk %}')">
+                Usar
+              </button>
+            {% endif %}
+          </div>
+          {% empty %}
+          <div class="small text-muted">Sin candidatos disponibles.</div>
+          {% endfor %}
+        </div>
+        {% endif %}
         {% endwith %}
       </div>
       <div class="text-right">
@@ -146,7 +194,8 @@ var PARADAS = [
     direccion: '{{ p.falabella_meta.direccion_original|default:p.entrega.cliente.direccion|escapejs }}',
     localidad: '{{ p.falabella_meta.localidad_original|default:p.entrega.cliente.comuna|escapejs }}',
     lat: {% if p.entrega.cliente.tiene_coordenadas %}{{ p.entrega.cliente.latitud|unlocalize }}{% else %}null{% endif %},
-    lon: {% if p.entrega.cliente.tiene_coordenadas %}{{ p.entrega.cliente.longitud|unlocalize }}{% else %}null{% endif %}
+    lon: {% if p.entrega.cliente.tiene_coordenadas %}{{ p.entrega.cliente.longitud|unlocalize }}{% else %}null{% endif %},
+    estado: '{% if p.falabella_meta %}{{ p.falabella_meta.estado_direccion }}{% else %}pendiente_busqueda{% endif %}'
   }{% if not forloop.last %},{% endif %}
 {% endfor %}
 ];
@@ -154,13 +203,12 @@ var PARADAS = [
 var paradaMarkers = {};
 var paradaHighlights = null;
 var paradaFocusId = null;
+var routePolyline = null;
 
 function getCookie(name) {
   var value = '; ' + document.cookie;
   var parts = value.split('; ' + name + '=');
-  if (parts.length === 2) {
-    return parts.pop().split(';').shift();
-  }
+  if (parts.length === 2) return parts.pop().split(';').shift();
   return '';
 }
 
@@ -171,17 +219,60 @@ function showFalabellaAlert(type, text) {
   box.innerHTML = '<div class="alert alert-' + type + ' py-2">' + text + '</div>';
 }
 
+function makeStopIcon(orden, estado) {
+  var color = '#36b9cc';
+  if (estado === 'confirmada_manual') color = '#1cc88a';
+  else if (estado === 'candidatos_disponibles') color = '#f6c23e';
+  return L.divIcon({
+    className: '',
+    html: '<div style="background:' + color + ';color:#fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;border:2px solid rgba(255,255,255,.9);box-shadow:0 2px 5px rgba(0,0,0,.35);">' + orden + '</div>',
+    iconSize: [28, 28],
+    iconAnchor: [14, 14],
+    popupAnchor: [0, -16]
+  });
+}
+
+function updatePolyline() {
+  if (routePolyline) map.removeLayer(routePolyline);
+  var coords = PARADAS
+    .filter(function(p) { return p.lat !== null && p.lon !== null; })
+    .map(function(p) { return [p.lat, p.lon]; });
+  if (coords.length >= 2) {
+    routePolyline = L.polyline(coords, {
+      color: '#36b9cc',
+      weight: 3,
+      dashArray: '8, 4',
+      opacity: 0.8
+    }).addTo(map);
+  }
+}
+
+function buildGoogleMapsRouteUrl() {
+  var stops = PARADAS.filter(function(p) { return p.lat !== null && p.lon !== null; });
+  if (!stops.length) return null;
+  var parts = ['-34.4068,-70.8583'];
+  stops.forEach(function(p) { parts.push(p.lat + ',' + p.lon); });
+  return 'https://www.google.com/maps/dir/' + parts.join('/');
+}
+
+function abrirRutaGoogleMaps() {
+  var url = buildGoogleMapsRouteUrl();
+  if (!url) {
+    showFalabellaAlert('warning', 'No hay paradas con coordenadas confirmadas para trazar la ruta.');
+    return;
+  }
+  window.open(url, '_blank', 'noopener');
+}
+
 function buildGoogleMapsSearchUrl(direccion, localidad) {
-  var parts = [direccion, localidad, 'Rancagua', 'Region de O\'Higgins', 'Chile'];
-  var query = parts.filter(function(part) { return part && String(part).trim(); }).join(', ');
+  var parts = [direccion, localidad, 'Rancagua', "Region de O'Higgins", 'Chile'];
+  var query = parts.filter(function(p) { return p && String(p).trim(); }).join(', ');
   return 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(query);
 }
 
 function updateStopNavigationLinks(paradaId, data) {
   var searchLink = document.getElementById('maps-search-link-' + paradaId);
-  if (searchLink) {
-    searchLink.href = data.google_maps_busqueda || searchLink.href;
-  }
+  if (searchLink) searchLink.href = data.google_maps_busqueda || searchLink.href;
 
   var coordsLink = document.getElementById('maps-coords-link-' + paradaId);
   if (coordsLink && data.google_maps_coordenadas) {
@@ -206,29 +297,21 @@ function updateStopNavigationLinks(paradaId, data) {
   }
 
   var direccionText = document.getElementById('direccion-text-' + paradaId);
-  if (direccionText) {
-    direccionText.innerHTML = '<i class="fas fa-map-marker-alt mr-1"></i>' + data.direccion_label;
-  }
+  if (direccionText) direccionText.innerHTML = '<i class="fas fa-map-marker-alt mr-1"></i>' + data.direccion_label;
 }
 
 function upsertMarker(paradaId, lat, lon) {
   var parada = null;
   for (var i = 0; i < PARADAS.length; i++) {
-    if (PARADAS[i].id === paradaId) {
-      parada = PARADAS[i];
-      break;
-    }
+    if (PARADAS[i].id === paradaId) { parada = PARADAS[i]; break; }
   }
-  if (!parada) {
-    return;
-  }
-
+  if (!parada) return;
   var marker = paradaMarkers[paradaId];
   if (!marker) {
-    marker = L.marker([lat, lon]).addTo(map).bindPopup('Parada ' + parada.orden + ' - ' + parada.nombre);
-    marker.on('click', function() {
-      enfocarParada(parada.id);
-    });
+    marker = L.marker([lat, lon], {icon: makeStopIcon(parada.orden, parada.estado)})
+      .addTo(map)
+      .bindPopup('Parada ' + parada.orden + ' – ' + parada.nombre);
+    marker.on('click', function() { enfocarParada(parada.id); });
     paradaMarkers[paradaId] = marker;
   } else {
     marker.setLatLng([lat, lon]);
@@ -237,18 +320,13 @@ function upsertMarker(paradaId, lat, lon) {
 
 function removeMarker(paradaId) {
   var marker = paradaMarkers[paradaId];
-  if (marker) {
-    map.removeLayer(marker);
-    delete paradaMarkers[paradaId];
-  }
+  if (marker) { map.removeLayer(marker); delete paradaMarkers[paradaId]; }
 }
 
 function setSelectedCard(paradaId) {
   if (paradaFocusId) {
     var prev = document.getElementById('stop-card-' + paradaFocusId);
-    if (prev) {
-      prev.classList.remove('stop-card-selected');
-    }
+    if (prev) prev.classList.remove('stop-card-selected');
   }
   paradaFocusId = paradaId;
   var card = document.getElementById('stop-card-' + paradaId);
@@ -261,34 +339,20 @@ function setSelectedCard(paradaId) {
 function enfocarParada(paradaId) {
   var parada = null;
   for (var i = 0; i < PARADAS.length; i++) {
-    if (PARADAS[i].id === paradaId) {
-      parada = PARADAS[i];
-      break;
-    }
+    if (PARADAS[i].id === paradaId) { parada = PARADAS[i]; break; }
   }
   if (!parada || parada.lat === null || parada.lon === null) {
     showFalabellaAlert('warning', 'Esa parada aún no tiene coordenadas confirmadas.');
     setSelectedCard(paradaId);
     return;
   }
-
   setSelectedCard(paradaId);
-
-  if (paradaHighlights) {
-    map.removeLayer(paradaHighlights);
-  }
+  if (paradaHighlights) map.removeLayer(paradaHighlights);
   paradaHighlights = L.circleMarker([parada.lat, parada.lon], {
-    radius: 12,
-    color: '#f0ad4e',
-    weight: 3,
-    fillColor: '#f0ad4e',
-    fillOpacity: 0.28,
+    radius: 14, color: '#f0ad4e', weight: 3, fillColor: '#f0ad4e', fillOpacity: 0.22
   }).addTo(map);
-
   var marker = paradaMarkers[paradaId];
-  if (marker) {
-    marker.openPopup();
-  }
+  if (marker) marker.openPopup();
   map.setView([parada.lat, parada.lon], Math.max(map.getZoom(), 15), {animate: true});
 }
 
@@ -298,17 +362,11 @@ function postJson(url, payload) {
     credentials: 'same-origin',
     headers: {'Content-Type': 'application/json', 'X-CSRFToken': CSRF, 'X-Requested-With': 'XMLHttpRequest'},
     body: JSON.stringify(payload || {})
-  }).then(function(r){
-    return r.text().then(function(text){
+  }).then(function(r) {
+    return r.text().then(function(text) {
       var data = {};
-      try {
-        data = text ? JSON.parse(text) : {};
-      } catch (e) {
-        data = { error: 'Respuesta inesperada del servidor (' + r.status + ').' };
-      }
-      if (!r.ok && !data.error) {
-        data.error = 'Error del servidor (' + r.status + ').';
-      }
+      try { data = text ? JSON.parse(text) : {}; } catch(e) { data = {error: 'Respuesta inesperada (' + r.status + ').'}; }
+      if (!r.ok && !data.error) data.error = 'Error del servidor (' + r.status + ').';
       return data;
     });
   });
@@ -316,30 +374,20 @@ function postJson(url, payload) {
 
 function marcarEntregado(paradaId) {
   var url = '{% url "routes:falabella_marcar_entregado" ruta.pk 0 %}'.replace('/0/entregado/', '/' + paradaId + '/entregado/');
-  postJson(url, {}).then(function(data){
-    if (data.error) {
-      showFalabellaAlert('danger', data.error);
-      return;
-    }
+  postJson(url, {}).then(function(data) {
+    if (data.error) { showFalabellaAlert('danger', data.error); return; }
     showFalabellaAlert('success', 'Estado actualizado a: ' + data.estado_display + '. Recargando...');
     window.location.reload();
-  }).catch(function(){
-    showFalabellaAlert('danger', 'No se pudo actualizar la entrega.');
-  });
+  }).catch(function() { showFalabellaAlert('danger', 'No se pudo actualizar la entrega.'); });
 }
 
 function reoptimizarFalabella() {
   var url = '{% url "routes:falabella_reoptimizar" ruta.pk %}';
-  postJson(url, {}).then(function(data){
-    if (data.error) {
-      showFalabellaAlert('danger', data.error);
-      return;
-    }
-    showFalabellaAlert('success', 'Ruta reoptimizada. Paradas geocodificadas: ' + data.con_coords + '. Pendientes: ' + data.pendientes + '.');
+  postJson(url, {}).then(function(data) {
+    if (data.error) { showFalabellaAlert('danger', data.error); return; }
+    showFalabellaAlert('success', 'Ruta reoptimizada. Geocodificadas: ' + data.con_coords + '. Pendientes: ' + data.pendientes + '. Recargando...');
     window.location.reload();
-  }).catch(function(){
-    showFalabellaAlert('danger', 'No se pudo reoptimizar la ruta.');
-  });
+  }).catch(function() { showFalabellaAlert('danger', 'No se pudo reoptimizar la ruta.'); });
 }
 
 function guardarDireccion(paradaId) {
@@ -347,31 +395,21 @@ function guardarDireccion(paradaId) {
   var localidadEl = document.getElementById('loc-' + paradaId);
   var direccion = direccionEl ? direccionEl.value.trim() : '';
   var localidad = localidadEl ? localidadEl.value.trim() : '';
-  if (!direccion) {
-    showFalabellaAlert('danger', 'Debes ingresar una dirección para buscar ubicación.');
-    return;
-  }
+  if (!direccion) { showFalabellaAlert('danger', 'Debes ingresar una dirección para buscar ubicación.'); return; }
 
   var url = '{% url "routes:falabella_update_address" ruta.pk 0 %}'.replace('/0/direccion/', '/' + paradaId + '/direccion/');
-  postJson(url, {direccion: direccion, localidad: localidad}).then(function(data){
-    if (data.error) {
-      showFalabellaAlert('danger', data.error);
-      return;
-    }
+  postJson(url, {direccion: direccion, localidad: localidad}).then(function(data) {
+    if (data.error) { showFalabellaAlert('danger', data.error); return; }
     var direccionLabel = direccion + (localidad ? ', ' + localidad : '');
     updateStopNavigationLinks(paradaId, {
       google_maps_busqueda: data.google_maps_busqueda || buildGoogleMapsSearchUrl(direccion, localidad),
       google_maps_coordenadas: data.google_maps_coordenadas || '',
       waze: data.waze || '',
-      direccion_label: direccionLabel,
+      direccion_label: direccionLabel
     });
-
     var paradaObj = null;
     for (var i = 0; i < PARADAS.length; i++) {
-      if (PARADAS[i].id === paradaId) {
-        paradaObj = PARADAS[i];
-        break;
-      }
+      if (PARADAS[i].id === paradaId) { paradaObj = PARADAS[i]; break; }
     }
     if (paradaObj) {
       paradaObj.direccion = direccion;
@@ -379,63 +417,59 @@ function guardarDireccion(paradaId) {
       if (data.latitud !== null && data.latitud !== undefined && data.longitud !== null && data.longitud !== undefined) {
         paradaObj.lat = data.latitud;
         paradaObj.lon = data.longitud;
+        paradaObj.estado = 'confirmada_manual';
         upsertMarker(paradaId, data.latitud, data.longitud);
-        if (paradaHighlights) {
-          map.removeLayer(paradaHighlights);
-          paradaHighlights = L.circleMarker([data.latitud, data.longitud], {
-            radius: 12,
-            color: '#f0ad4e',
-            weight: 3,
-            fillColor: '#f0ad4e',
-            fillOpacity: 0.28,
-          }).addTo(map);
-        }
+        updatePolyline();
+        if (paradaHighlights) map.removeLayer(paradaHighlights);
+        paradaHighlights = L.circleMarker([data.latitud, data.longitud], {
+          radius: 14, color: '#f0ad4e', weight: 3, fillColor: '#f0ad4e', fillOpacity: 0.22
+        }).addTo(map);
       } else {
         paradaObj.lat = null;
         paradaObj.lon = null;
         removeMarker(paradaId);
-        if (paradaHighlights) {
-          map.removeLayer(paradaHighlights);
-          paradaHighlights = null;
-        }
+        updatePolyline();
+        if (paradaHighlights) { map.removeLayer(paradaHighlights); paradaHighlights = null; }
       }
     }
-
     if (data.geocodificada_auto) {
-      showFalabellaAlert('success', 'Dirección actualizada y marcador sincronizado automáticamente.');
+      showFalabellaAlert('success', 'Dirección actualizada y marcador sincronizado.');
       enfocarParada(paradaId);
     } else {
-      showFalabellaAlert('warning', 'Dirección actualizada, pero no se encontró una coincidencia exacta para ubicar el marcador.');
+      showFalabellaAlert('warning', 'Dirección actualizada, pero no se encontró coincidencia exacta para ubicar el marcador.');
     }
-  }).catch(function(){
-    showFalabellaAlert('danger', 'No se pudo actualizar la dirección.');
-  });
+  }).catch(function() { showFalabellaAlert('danger', 'No se pudo actualizar la dirección.'); });
+}
+
+function seleccionarCandidato(url) {
+  postJson(url, {}).then(function(data) {
+    if (data.error) { showFalabellaAlert('danger', data.error); return; }
+    showFalabellaAlert('success', 'Ubicación actualizada. Recargando...');
+    window.location.reload();
+  }).catch(function() { showFalabellaAlert('danger', 'No se pudo actualizar la ubicación.'); });
 }
 
 var map = L.map('mapFalabella').setView([-34.20, -70.80], 10);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {attribution: '© OpenStreetMap'}).addTo(map);
-if (PARADAS.some(function(parada) { return parada.lat !== null && parada.lon !== null; })) {
-  var bounds = [];
-  PARADAS.forEach(function(parada) {
-    if (parada.lat === null || parada.lon === null) {
-      return;
-    }
-    var marker = L.marker([parada.lat, parada.lon]).addTo(map).bindPopup('Parada ' + parada.orden + ' - ' + parada.nombre);
-    paradaMarkers[parada.id] = marker;
-    marker.on('click', function() {
-      enfocarParada(parada.id);
-    });
-    bounds.push([parada.lat, parada.lon]);
-  });
-  map.fitBounds(bounds, {padding:[24,24]});
-}
+
+var bounds = [];
+PARADAS.forEach(function(parada) {
+  if (parada.lat === null || parada.lon === null) return;
+  var marker = L.marker([parada.lat, parada.lon], {icon: makeStopIcon(parada.orden, parada.estado)})
+    .addTo(map)
+    .bindPopup('Parada ' + parada.orden + ' – ' + parada.nombre);
+  paradaMarkers[parada.id] = marker;
+  marker.on('click', function() { enfocarParada(parada.id); });
+  bounds.push([parada.lat, parada.lon]);
+});
+
+if (bounds.length) map.fitBounds(bounds, {padding: [24, 24]});
+updatePolyline();
 
 document.querySelectorAll('[data-parada-id]').forEach(function(card) {
   card.addEventListener('click', function(event) {
     var paradaId = parseInt(card.getAttribute('data-parada-id'), 10);
-    if (!event.target.closest('button') && !event.target.closest('a')) {
-      enfocarParada(paradaId);
-    }
+    if (!event.target.closest('button') && !event.target.closest('a')) enfocarParada(paradaId);
   });
 });
 </script>
