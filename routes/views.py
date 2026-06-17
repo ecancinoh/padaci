@@ -1276,9 +1276,26 @@ def ruta_falabella_import(request):
                                         observacion=f'Ruta Falabella importada desde Excel ({empresa_name}/{patente_name}).',
                                     )
 
-                                for idx, row in enumerate(rows, start=1):
-                                    direccion = row.get('direccion', '').strip()
-                                    localidad = row.get('localidad', '').strip()[:100]
+                                # Agrupar filas por dirección+localidad: una parada por ubicación única.
+                                from collections import OrderedDict
+                                grupos = OrderedDict()
+                                for row in rows:
+                                    dir_norm = row.get('direccion', '').strip().lower()
+                                    loc_norm = row.get('localidad', '').strip().lower()
+                                    key = (dir_norm, loc_norm)
+                                    if key not in grupos:
+                                        grupos[key] = {
+                                            'direccion': row.get('direccion', '').strip(),
+                                            'localidad': row.get('localidad', '').strip()[:100],
+                                            'count': 0,
+                                        }
+                                    grupos[key]['count'] += 1
+
+                                for idx, grupo in enumerate(grupos.values(), start=1):
+                                    direccion = grupo['direccion']
+                                    localidad = grupo['localidad']
+                                    cantidad = grupo['count']
+
                                     cliente = Cliente.objects.filter(
                                         empresa=empresa,
                                         direccion__iexact=direccion,
@@ -1314,7 +1331,7 @@ def ruta_falabella_import(request):
                                         conductor=ruta.conductor,
                                         estado='pendiente',
                                         fecha_programada=ruta.fecha,
-                                        descripcion='Entrega Falabella',
+                                        descripcion=f'Entrega Falabella ({cantidad} pedido{"s" if cantidad > 1 else ""})',
                                     )
 
                                     # Evita choques de unicidad (ruta, orden) cuando la ruta ya tiene paradas previas.
@@ -1328,44 +1345,36 @@ def ruta_falabella_import(request):
                                         ParadaFalabellaMeta.objects.filter(parada=parada).delete()
 
                                     ParadaUbicacionCandidata.objects.filter(parada=parada).delete()
+                                    # Si el cliente ya tiene coordenadas (importación previa), marcar directo sin geocodificar.
+                                    estado_inicial = 'confirmada_manual' if (cliente.latitud is not None and cliente.longitud is not None) else 'pendiente_busqueda'
                                     ParadaFalabellaMeta.objects.update_or_create(
                                         parada=parada,
                                         defaults={
-                                            'direccion_importada': row.get('direccion', ''),
-                                            'localidad_importada': row.get('localidad', ''),
-                                            'direccion_original': row.get('direccion', ''),
-                                            'localidad_original': row.get('localidad', ''),
+                                            'direccion_importada': direccion,
+                                            'localidad_importada': localidad,
+                                            'direccion_original': direccion,
+                                            'localidad_original': localidad,
                                             'contacto_original': '',
-                                            'estado_direccion': 'pendiente_busqueda',
+                                            'estado_direccion': estado_inicial,
+                                            'cantidad_pedidos': cantidad,
                                         },
                                     )
 
-                                    geocode_coords = _geocode_free_address(row.get('direccion', ''), row.get('localidad', ''))
-                                    if geocode_coords:
-                                        cliente.latitud, cliente.longitud = geocode_coords
-                                        cliente.save(update_fields=['latitud', 'longitud', 'fecha_actualizacion'])
-                                        ParadaFalabellaMeta.objects.filter(parada=parada).update(estado_direccion='confirmada_manual')
-                                    else:
-                                        # Mantener coordenadas existentes si ya estaban confirmadas para no perder el pin.
-                                        if cliente.latitud is None or cliente.longitud is None:
-                                            ParadaFalabellaMeta.objects.filter(parada=parada).update(estado_direccion='requiere_llamada_cliente')
-                                        else:
-                                            ParadaFalabellaMeta.objects.filter(parada=parada).update(estado_direccion='confirmada_manual')
-
                                 if reutilizada:
-                                    ruta.paradas.filter(orden__gt=len(rows)).delete()
-
-                                _falabella_optimizar_con_anclas(ruta)
+                                    ruta.paradas.filter(orden__gt=len(grupos)).delete()
                         except Exception as exc:
                             if not form.non_field_errors():
                                 form.add_error(None, f'No fue posible crear la ruta: {exc}')
                         else:
                             accion = 'actualizada' if reutilizada else 'creada'
+                            n_paradas = len(grupos)
+                            n_pedidos = len(rows)
+                            agrupadas = f' ({n_pedidos} pedidos consolidados en {n_paradas} paradas)' if n_pedidos != n_paradas else ''
                             messages.success(
                                 request,
-                                f'Ruta Falabella {accion} con {len(rows)} paradas. Navegación basada en direcciones de Google Maps.',
+                                f'Ruta Falabella {accion} con {n_paradas} paradas{agrupadas}. Geocodificando en segundo plano…',
                             )
-                            return redirect('routes:falabella_detail', pk=ruta.pk)
+                            return redirect(reverse_lazy('routes:falabella_detail', kwargs={'pk': ruta.pk}) + '?geocodificando=1')
     else:
         form = RutaFalabellaExcelForm(
             initial=initial_data,
@@ -1389,6 +1398,56 @@ def ruta_falabella_import(request):
 
 
 @login_required
+def falabella_geocodificar_siguiente(request, pk):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Método no permitido.'}, status=405)
+    ruta = get_object_or_404(RutaDia, pk=pk, modalidad='falabella')
+    total = ruta.paradas.count()
+
+    pendiente = (
+        ParadaFalabellaMeta.objects
+        .filter(parada__ruta=ruta, estado_direccion='pendiente_busqueda')
+        .select_related('parada__entrega__cliente')
+        .first()
+    )
+
+    if pendiente is None:
+        _falabella_optimizar_con_anclas(ruta)
+        return JsonResponse({'ok': True, 'pendientes': 0, 'total': total, 'listo': True})
+
+    meta = pendiente
+    parada = meta.parada
+    cliente = parada.entrega.cliente
+
+    if cliente.latitud is not None and cliente.longitud is not None:
+        meta.estado_direccion = 'confirmada_manual'
+    else:
+        geocode_coords = _geocode_free_address(meta.direccion_original or '', meta.localidad_original or '')
+        if geocode_coords:
+            cliente.latitud, cliente.longitud = geocode_coords
+            cliente.save(update_fields=['latitud', 'longitud', 'fecha_actualizacion'])
+            meta.estado_direccion = 'confirmada_manual'
+        else:
+            meta.estado_direccion = 'requiere_llamada_cliente'
+    meta.save(update_fields=['estado_direccion', 'fecha_actualizacion'])
+
+    pendientes_restantes = ParadaFalabellaMeta.objects.filter(
+        parada__ruta=ruta, estado_direccion='pendiente_busqueda'
+    ).count()
+
+    if pendientes_restantes == 0:
+        _falabella_optimizar_con_anclas(ruta)
+
+    return JsonResponse({
+        'ok': True,
+        'parada_id': parada.pk,
+        'pendientes': pendientes_restantes,
+        'total': total,
+        'listo': pendientes_restantes == 0,
+    })
+
+
+@login_required
 def ruta_falabella_detail(request, pk):
     ruta = get_object_or_404(
         RutaDia.objects.select_related('empresa', 'conductor', 'peoneta'),
@@ -1401,6 +1460,9 @@ def ruta_falabella_detail(request, pk):
     ).prefetch_related(
         'ubicaciones_candidatas',
     ).order_by('orden')
+    pendientes_geocodificar = ParadaFalabellaMeta.objects.filter(
+        parada__ruta=ruta, estado_direccion='pendiente_busqueda'
+    ).count()
     return render(
         request,
         'routes/falabella_detail.html',
@@ -1409,6 +1471,8 @@ def ruta_falabella_detail(request, pk):
             'paradas': paradas,
             'coord_rengo': COORD_RANGO_RENGO,
             'coord_rancagua': COORD_RANGO_RANCAGUA,
+            'pendientes_geocodificar': pendientes_geocodificar,
+            'total_paradas': paradas.count(),
         },
     )
 
