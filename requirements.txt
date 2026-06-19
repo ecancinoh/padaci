@@ -21,6 +21,9 @@ djangorestframework==3.15.1
 google-genai==1.10.0
 ftfy==6.2.3
 
+# ── Excel ─────────────────────────────────────────────────────
+openpyxl==3.1.5
+
 # ── Static files (production) ─────────────────────────────────
 whitenoise==6.6.0
 

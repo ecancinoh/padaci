@@ -40,7 +40,7 @@ class AsistenciaDiariaFiltroForm(forms.Form):
     )
     vista = forms.ChoiceField(
         choices=VISTA_CHOICES,
-        initial=VISTA_DIA,
+        initial=VISTA_SEMANA,
         widget=forms.Select(attrs={'class': 'form-control form-control-sm'}),
         label='Vista',
     )

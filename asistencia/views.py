@@ -103,7 +103,7 @@ def asistencia_diaria(request):
         vista = form.cleaned_data['vista']
     else:
         fecha = fecha_base
-        vista = AsistenciaDiariaFiltroForm.VISTA_DIA
+        vista = AsistenciaDiariaFiltroForm.VISTA_SEMANA
 
     fechas_periodo = _build_period_dates(fecha, vista)
 
