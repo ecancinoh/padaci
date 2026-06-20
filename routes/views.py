@@ -100,6 +100,7 @@ def _read_excel_rows(file_obj):
         'patente': ['patente'],
         'direccion': ['direccion', 'direccion cliente', 'direccion de entrega'],
         'localidad': ['localidad', 'comuna', 'ciudad'],
+        'obs': ['obs', 'observacion', 'observaciones', 'nota', 'notas'],
     }
 
     required = ['empresa', 'patente', 'direccion', 'localidad']
@@ -165,12 +166,17 @@ def _read_excel_rows(file_obj):
         if not empresa or not patente or not direccion:
             continue
 
+        obs = ''
+        if 'obs' in col_index:
+            obs = str(row[col_index['obs']] or '').strip()
+
         parsed_rows.append({
             'row_number': idx,
             'empresa': empresa,
             'patente': patente,
             'direccion': direccion,
             'localidad': localidad,
+            'obs': obs,
         })
 
     if not parsed_rows:
@@ -1288,13 +1294,18 @@ def ruta_falabella_import(request):
                                             'direccion': row.get('direccion', '').strip(),
                                             'localidad': row.get('localidad', '').strip()[:100],
                                             'count': 0,
+                                            'obs_parts': [],
                                         }
                                     grupos[key]['count'] += 1
+                                    obs_val = row.get('obs', '').strip()
+                                    if obs_val and obs_val not in grupos[key]['obs_parts']:
+                                        grupos[key]['obs_parts'].append(obs_val)
 
                                 for idx, grupo in enumerate(grupos.values(), start=1):
                                     direccion = grupo['direccion']
                                     localidad = grupo['localidad']
                                     cantidad = grupo['count']
+                                    obs_texto = ' | '.join(grupo['obs_parts'])
 
                                     cliente = Cliente.objects.filter(
                                         empresa=empresa,
@@ -1357,6 +1368,7 @@ def ruta_falabella_import(request):
                                             'contacto_original': '',
                                             'estado_direccion': estado_inicial,
                                             'cantidad_pedidos': cantidad,
+                                            'observacion_importada': obs_texto,
                                         },
                                     )
 

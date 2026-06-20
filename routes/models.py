@@ -353,6 +353,7 @@ class ParadaFalabellaMeta(models.Model):
     )
     observacion_llamada = models.CharField(max_length=240, blank=True, default='', verbose_name='Observacion llamada')
     cantidad_pedidos = models.PositiveSmallIntegerField(default=1, verbose_name='Cantidad de pedidos en esta parada')
+    observacion_importada = models.TextField(blank=True, default='', verbose_name='Observación importada del Excel')
     coordenada_manual_lat = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True, verbose_name='Latitud manual')
     coordenada_manual_lon = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True, verbose_name='Longitud manual')
     fecha_actualizacion = models.DateTimeField(auto_now=True)

@@ -8,6 +8,8 @@
 <style>
   #mapFalabella { height: 480px; border-radius: .35rem; }
   #paradas-list .stop-card { border-left: 4px solid #36b9cc; touch-action: pan-y; }
+  #paradas-list .stop-card.tiene-obs { border-left-color: #e74a3b; }
+  .obs-importada { background: #fff3cd; border-left: 3px solid #f6c23e; padding: 4px 8px; border-radius: 3px; font-size: .82rem; }
   .stop-card-selected { border-left-color: #f0ad4e !important; box-shadow: 0 0 0 2px rgba(240,173,78,.18); }
   .stop-title { cursor: pointer; }
   .pill { font-size: .72rem; }
@@ -81,7 +83,7 @@
 
 <div id="paradas-list">
 {% for p in paradas %}
-<div class="card stop-card shadow-sm mb-3" id="stop-card-{{ p.pk|unlocalize }}" data-parada-id="{{ p.pk|unlocalize }}">
+<div class="card stop-card shadow-sm mb-3{% if p.falabella_meta.observacion_importada %} tiene-obs{% endif %}" id="stop-card-{{ p.pk|unlocalize }}" data-parada-id="{{ p.pk|unlocalize }}">
   <div class="card-body py-2">
     <div class="d-flex justify-content-between align-items-start">
 
@@ -114,6 +116,13 @@
           <span class="text-secondary font-weight-bold">Editada:</span>
           <span id="dir-editada-text-{{ p.pk|unlocalize }}">{{ m.direccion_original }}{% if m.localidad_original %}, {{ m.localidad_original }}{% endif %}</span>
         </div>
+
+        {% if m.observacion_importada %}
+        <div class="obs-importada mt-1">
+          <i class="fas fa-exclamation-triangle mr-1 text-warning"></i>
+          <strong>Obs:</strong> {{ m.observacion_importada }}
+        </div>
+        {% endif %}
 
         <div class="small text-muted"><i class="fas fa-phone mr-1"></i>{{ m.contacto_original|default:'Sin contacto' }}</div>
 
