@@ -101,13 +101,24 @@ def asistencia_diaria(request):
     if form.is_valid():
         fecha = form.cleaned_data['fecha']
         vista = form.cleaned_data['vista']
+        ids_seleccionados = [int(pk) for pk in form.cleaned_data.get('trabajadores', [])]
     else:
         fecha = fecha_base
-        vista = AsistenciaDiariaFiltroForm.VISTA_SEMANA
+        vista = AsistenciaDiariaFiltroForm.VISTA_MES
+        ids_seleccionados = []
 
     fechas_periodo = _build_period_dates(fecha, vista)
+    todos_los_trabajadores = get_worker_queryset()
 
-    trabajadores = list(get_worker_queryset())
+    if ids_seleccionados:
+        trabajadores = list(todos_los_trabajadores.filter(pk__in=ids_seleccionados))
+    else:
+        # Mostrar solo trabajadores con al menos un registro en el período
+        con_registro = set(
+            Asistencia.objects.filter(fecha__in=fechas_periodo)
+            .values_list('usuario_id', flat=True)
+        )
+        trabajadores = [t for t in todos_los_trabajadores if t.pk in con_registro]
 
     asistencia_map = {
         (a.usuario_id, a.fecha): a

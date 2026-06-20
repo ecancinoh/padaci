@@ -22,6 +22,14 @@ class AsistenciaForm(forms.ModelForm):
             field.widget.attrs.update({'class': 'form-control'})
 
 
+def _worker_choices():
+    workers = CustomUser.objects.filter(
+        rol__in=['conductor', 'peoneta'],
+        activo=True,
+    ).order_by('last_name', 'first_name', 'username')
+    return [(str(w.pk), w.get_full_name() or w.username) for w in workers]
+
+
 class AsistenciaDiariaFiltroForm(forms.Form):
     VISTA_DIA = 'dia'
     VISTA_SEMANA = 'semana'
@@ -40,7 +48,17 @@ class AsistenciaDiariaFiltroForm(forms.Form):
     )
     vista = forms.ChoiceField(
         choices=VISTA_CHOICES,
-        initial=VISTA_SEMANA,
+        initial=VISTA_MES,
         widget=forms.Select(attrs={'class': 'form-control form-control-sm'}),
         label='Vista',
     )
+    trabajadores = forms.MultipleChoiceField(
+        choices=[],
+        required=False,
+        widget=forms.SelectMultiple(attrs={'class': 'form-control form-control-sm', 'size': '5'}),
+        label='Trabajadores',
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['trabajadores'].choices = _worker_choices()

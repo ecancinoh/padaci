@@ -24,16 +24,26 @@
 <div class="card shadow-sm mb-4">
   <div class="card-header py-3">
     <form method="get" class="form-row align-items-end">
-      <div class="col-sm-4 col-md-3">
+      <div class="col-sm-6 col-md-2">
         <label for="id_fecha">Fecha</label>
         {{ form.fecha }}
       </div>
-      <div class="col-sm-4 col-md-3">
+      <div class="col-sm-6 col-md-2">
         <label for="id_vista">Vista</label>
         {{ form.vista }}
       </div>
-      <div class="col-sm-4 col-md-2">
-        <button type="submit" class="btn btn-primary btn-sm btn-block">Cargar</button>
+      <div class="col-sm-12 col-md-5">
+        <label for="id_trabajadores">
+          Trabajadores
+          <small class="text-muted font-weight-normal">(sin selección = solo con registros)</small>
+        </label>
+        {{ form.trabajadores }}
+      </div>
+      <div class="col-sm-12 col-md-3 d-flex align-items-end mt-2 mt-md-0" style="gap:.4rem;">
+        <button type="submit" class="btn btn-primary btn-sm flex-grow-1">Cargar</button>
+        <a href="{% url 'asistencia:diaria' %}" class="btn btn-outline-secondary btn-sm" title="Limpiar filtros">
+          <i class="fas fa-times"></i>
+        </a>
       </div>
     </form>
   </div>
@@ -97,7 +107,7 @@
             {% endwith %}
             {% empty %}
             <tr>
-              <td colspan="{{ headers|length|add:'3' }}" class="text-center text-muted">No hay trabajadores activos para registrar.</td>
+              <td colspan="{{ headers|length|add:'3' }}" class="text-center text-muted">No hay registros en este período. Selecciona trabajadores en el filtro para agregarlos.</td>
             </tr>
             {% endfor %}
           </tbody>
