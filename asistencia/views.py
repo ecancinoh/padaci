@@ -141,12 +141,16 @@ def asistencia_diaria(request):
                 if not observacion and registro_actual:
                     observacion = registro_actual.observacion
 
+                pagado_key = f'pagado_{trabajador.pk}_{key_fecha}'
+                pagado = pagado_key in request.POST
+
                 Asistencia.objects.update_or_create(
                     usuario=trabajador,
                     fecha=fecha_celda,
                     defaults={
                         'estado': estado,
                         'observacion': observacion,
+                        'pagado': pagado,
                         'registrado_por': request.user,
                     },
                 )
@@ -172,6 +176,10 @@ def asistencia_diaria(request):
                     'checked': bool(
                         asistencia_map.get((trabajador.pk, fecha_celda))
                         and asistencia_map[(trabajador.pk, fecha_celda)].estado == Asistencia.ESTADO_PRESENTE
+                    ),
+                    'pagado': bool(
+                        asistencia_map.get((trabajador.pk, fecha_celda))
+                        and asistencia_map[(trabajador.pk, fecha_celda)].pagado
                     ),
                     'registro': asistencia_map.get((trabajador.pk, fecha_celda)),
                 }

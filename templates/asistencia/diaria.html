@@ -38,7 +38,11 @@
     </form>
   </div>
   <div class="card-body">
-    <p class="small text-muted mb-3">Marca solo los presentes; no marcado se guarda como ausente.</p>
+    <p class="small text-muted mb-3">
+      Marca solo los presentes; no marcado se guarda como ausente.<br>
+      <input type="checkbox" disabled> Presente &nbsp;&nbsp;
+      <input type="checkbox" disabled style="accent-color:#1cc88a;"> <span class="text-success font-weight-bold">$</span> Día pagado
+    </p>
     <form method="post">
       {% csrf_token %}
       <input type="hidden" name="fecha" value="{{ fecha|date:'Y-m-d' }}">
@@ -65,13 +69,27 @@
               <td>{{ trabajador.get_full_name }}</td>
               <td><span class="badge badge-secondary">{{ trabajador.get_rol_display }}</span></td>
               {% for cell in row.celdas %}
-              <td class="text-center align-middle">
-                <input
-                  type="checkbox"
-                  name="presente_{{ trabajador.pk }}_{{ cell.fecha|date:'Ymd' }}"
-                  value="1"
-                  {% if cell.checked %}checked{% endif %}
-                >
+              <td class="text-center align-middle" style="min-width:60px;">
+                <div>
+                  <input
+                    type="checkbox"
+                    name="presente_{{ trabajador.pk }}_{{ cell.fecha|date:'Ymd' }}"
+                    value="1"
+                    title="Presente"
+                    {% if cell.checked %}checked{% endif %}
+                  >
+                </div>
+                <div class="mt-1">
+                  <input
+                    type="checkbox"
+                    name="pagado_{{ trabajador.pk }}_{{ cell.fecha|date:'Ymd' }}"
+                    value="1"
+                    title="Día pagado"
+                    {% if cell.pagado %}checked{% endif %}
+                    style="accent-color:#1cc88a;"
+                  >
+                  <small class="text-success" style="font-size:.65rem;">$</small>
+                </div>
               </td>
               {% endfor %}
               <td class="text-center font-weight-bold">{{ row.total_presentes }}</td>

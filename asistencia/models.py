@@ -21,6 +21,7 @@ class Asistencia(models.Model):
     fecha = models.DateField(default=timezone.localdate, verbose_name='Fecha')
     estado = models.CharField(max_length=10, choices=ESTADO_CHOICES, default=ESTADO_PRESENTE, verbose_name='Estado')
     observacion = models.CharField(max_length=255, blank=True, verbose_name='Observación')
+    pagado = models.BooleanField(default=False, verbose_name='Día pagado')
     registrado_por = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
