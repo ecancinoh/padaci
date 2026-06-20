@@ -53,7 +53,7 @@
     <strong>Mapa de paradas</strong>
     <small class="text-muted">
       <span class="mr-2"><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#1cc88a;"></span> Confirmada</span>
-      <span class="mr-2"><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#f6c23e;"></span> Candidatos</span>
+      <span class="mr-2"><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#f6c23e;"></span> Con observación</span>
       <span><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#36b9cc;"></span> Sin estado</span>
     </small>
   </div>
@@ -245,7 +245,8 @@ var PARADAS = [
     localidad: '{{ p.falabella_meta.localidad_original|default:p.entrega.cliente.comuna|escapejs }}',
     lat: {% if p.entrega.cliente.tiene_coordenadas %}{{ p.entrega.cliente.latitud|unlocalize }}{% else %}null{% endif %},
     lon: {% if p.entrega.cliente.tiene_coordenadas %}{{ p.entrega.cliente.longitud|unlocalize }}{% else %}null{% endif %},
-    estado: '{% if p.falabella_meta %}{{ p.falabella_meta.estado_direccion }}{% else %}pendiente_busqueda{% endif %}'
+    estado: '{% if p.falabella_meta %}{{ p.falabella_meta.estado_direccion }}{% else %}pendiente_busqueda{% endif %}',
+    obs: '{{ p.falabella_meta.observacion_importada|escapejs }}'
   }{% if not forloop.last %},{% endif %}
 {% endfor %}
 ];
@@ -268,9 +269,10 @@ function showFalabellaAlert(type, text) {
   box.innerHTML = '<div class="alert alert-' + type + ' py-2">' + text + '</div>';
 }
 
-function makeStopIcon(orden, estado) {
+function makeStopIcon(orden, estado, obs) {
   var color = '#36b9cc';
-  if (estado === 'confirmada_manual') color = '#1cc88a';
+  if (obs) color = '#f6c23e';
+  else if (estado === 'confirmada_manual') color = '#1cc88a';
   else if (estado === 'candidatos_disponibles') color = '#f6c23e';
   return L.divIcon({
     className: '',
@@ -339,7 +341,7 @@ function upsertMarker(paradaId, lat, lon) {
   if (!parada) return;
   var marker = paradaMarkers[paradaId];
   if (!marker) {
-    marker = L.marker([lat, lon], {icon: makeStopIcon(parada.orden, parada.estado)})
+    marker = L.marker([lat, lon], {icon: makeStopIcon(parada.orden, parada.estado, parada.obs)})
       .addTo(map).bindPopup('Parada ' + parada.orden + ' – ' + parada.nombre);
     marker.on('click', function() { enfocarParada(parada.id); });
     paradaMarkers[paradaId] = marker;
@@ -471,7 +473,7 @@ function saveNewOrder(paradaIds) {
       if (p) {
         p.orden = newOrden;
         var marker = paradaMarkers[pid];
-        if (marker) { marker.setIcon(makeStopIcon(newOrden, p.estado)); marker.setPopupContent('Parada ' + newOrden + ' – ' + p.nombre); }
+        if (marker) { marker.setIcon(makeStopIcon(newOrden, p.estado, p.obs)); marker.setPopupContent('Parada ' + newOrden + ' – ' + p.nombre); }
         var badge = document.getElementById('orden-badge-' + pid);
         if (badge) badge.textContent = 'Parada ' + newOrden;
       }
@@ -525,7 +527,7 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {attribution: 
 var bounds = [];
 PARADAS.forEach(function(parada) {
   if (parada.lat === null || parada.lon === null) return;
-  var marker = L.marker([parada.lat, parada.lon], {icon: makeStopIcon(parada.orden, parada.estado)})
+  var marker = L.marker([parada.lat, parada.lon], {icon: makeStopIcon(parada.orden, parada.estado, parada.obs)})
     .addTo(map).bindPopup('Parada ' + parada.orden + ' – ' + parada.nombre);
   paradaMarkers[parada.id] = marker;
   marker.on('click', function() { enfocarParada(parada.id); });
