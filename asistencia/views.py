@@ -110,10 +110,15 @@ def asistencia_diaria(request):
     fechas_periodo = _build_period_dates(fecha, vista)
     todos_los_trabajadores = list(get_worker_queryset())
 
-    # Al guardar (POST) siempre iterar todos los trabajadores para no perder datos.
-    # El filtro visual solo aplica al GET (display).
+    # Al guardar (POST) solo procesar los trabajadores que estaban visibles en la tabla
+    # (identificados por el campo oculto trabajador_visible_PK).
+    # Así no se sobreescriben datos de trabajadores no incluidos en la vista actual.
     if request.method == 'POST':
-        trabajadores_guardar = todos_los_trabajadores
+        visibles_ids = {
+            t.pk for t in todos_los_trabajadores
+            if f'trabajador_visible_{t.pk}' in request.POST
+        }
+        trabajadores_guardar = [t for t in todos_los_trabajadores if t.pk in visibles_ids]
     elif ids_seleccionados:
         trabajadores_guardar = [t for t in todos_los_trabajadores if t.pk in ids_seleccionados]
     else:

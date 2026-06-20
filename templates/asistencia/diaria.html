@@ -75,6 +75,7 @@
           <tbody>
             {% for row in rows %}
             {% with trabajador=row.trabajador %}
+            <input type="hidden" name="trabajador_visible_{{ trabajador.pk }}" value="1">
             <tr>
               <td>{{ trabajador.get_full_name }}</td>
               <td><span class="badge badge-secondary">{{ trabajador.get_rol_display }}</span></td>
