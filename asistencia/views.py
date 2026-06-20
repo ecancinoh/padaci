@@ -108,12 +108,21 @@ def asistencia_diaria(request):
         ids_seleccionados = []
 
     fechas_periodo = _build_period_dates(fecha, vista)
-    todos_los_trabajadores = get_worker_queryset()
+    todos_los_trabajadores = list(get_worker_queryset())
 
-    if ids_seleccionados:
-        trabajadores = list(todos_los_trabajadores.filter(pk__in=ids_seleccionados))
+    # Al guardar (POST) siempre iterar todos los trabajadores para no perder datos.
+    # El filtro visual solo aplica al GET (display).
+    if request.method == 'POST':
+        trabajadores_guardar = todos_los_trabajadores
+    elif ids_seleccionados:
+        trabajadores_guardar = [t for t in todos_los_trabajadores if t.pk in ids_seleccionados]
     else:
-        # Mostrar solo trabajadores con al menos un día presente en el período
+        trabajadores_guardar = todos_los_trabajadores
+
+    # Trabajadores a mostrar en tabla (filtrado visual)
+    if ids_seleccionados:
+        trabajadores = [t for t in todos_los_trabajadores if t.pk in ids_seleccionados]
+    else:
         con_presencia = set(
             Asistencia.objects.filter(
                 fecha__range=(fechas_periodo[0], fechas_periodo[-1]),
@@ -124,14 +133,14 @@ def asistencia_diaria(request):
 
     asistencia_map = {
         (a.usuario_id, a.fecha): a
-        for a in Asistencia.objects.filter(fecha__in=fechas_periodo, usuario__in=trabajadores)
+        for a in Asistencia.objects.filter(fecha__in=fechas_periodo, usuario__in=todos_los_trabajadores)
     }
 
     if request.method == 'POST':
         actualizados = 0
         es_un_dia = len(fechas_periodo) == 1
 
-        for trabajador in trabajadores:
+        for trabajador in trabajadores_guardar:
             for fecha_celda in fechas_periodo:
                 key_fecha = fecha_celda.strftime('%Y%m%d')
                 presente_key = f'presente_{trabajador.pk}_{key_fecha}'
