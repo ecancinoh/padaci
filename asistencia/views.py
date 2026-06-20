@@ -113,12 +113,14 @@ def asistencia_diaria(request):
     if ids_seleccionados:
         trabajadores = list(todos_los_trabajadores.filter(pk__in=ids_seleccionados))
     else:
-        # Mostrar solo trabajadores con al menos un registro en el período
-        con_registro = set(
-            Asistencia.objects.filter(fecha__in=fechas_periodo)
-            .values_list('usuario_id', flat=True)
+        # Mostrar solo trabajadores con al menos un día presente en el período
+        con_presencia = set(
+            Asistencia.objects.filter(
+                fecha__range=(fechas_periodo[0], fechas_periodo[-1]),
+                estado=Asistencia.ESTADO_PRESENTE,
+            ).values_list('usuario_id', flat=True)
         )
-        trabajadores = [t for t in todos_los_trabajadores if t.pk in con_registro]
+        trabajadores = [t for t in todos_los_trabajadores if t.pk in con_presencia]
 
     asistencia_map = {
         (a.usuario_id, a.fecha): a
