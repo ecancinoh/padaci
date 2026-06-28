@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Entregas Públicas{% endblock %}
+{% block active_public_delivery %}active{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+  <div class="d-sm-flex align-items-center justify-content-between mb-4">
+    <h1 class="h3 mb-0 text-gray-800">Entregas Públicas</h1>
+    <a href="{% url 'public_delivery:portal_create' %}" class="btn btn-primary btn-sm shadow-sm">
+      <i class="fas fa-plus fa-sm text-white-50 mr-1"></i> Nueva entrega
+    </a>
+  </div>
+
+  <!-- Filtro estado -->
+  <form method="get" class="mb-3 d-flex gap-2 align-items-center">
+    <select name="estado" class="form-control form-control-sm" style="width:200px;" onchange="this.form.submit()">
+      <option value="">Todos los estados</option>
+      {% for val, label in status_choices %}
+      <option value="{{ val }}" {% if estado_filter == val %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+    {% if estado_filter %}
+    <a href="{% url 'public_delivery:portal_list' %}" class="btn btn-sm btn-outline-secondary">Limpiar</a>
+    {% endif %}
+  </form>
+
+  <div class="card shadow mb-4">
+    <div class="card-body p-0">
+      {% if entregas %}
+      <div class="table-responsive">
+        <table class="table table-hover mb-0">
+          <thead class="thead-light">
+            <tr>
+              <th>Código</th>
+              <th>Vehículo</th>
+              <th>Cliente</th>
+              <th>Conductor</th>
+              <th>Paradas</th>
+              <th>Fecha</th>
+              <th>Estado</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for e in entregas %}
+            <tr>
+              <td><span class="font-weight-bold text-dark font-mono">{{ e.tracking_code }}</span></td>
+              <td class="text-muted small">{{ e.get_vehicle_display }}</td>
+              <td class="text-muted small">{{ e.client_name|default:"—" }}</td>
+              <td class="text-muted small">{{ e.driver_name|default:"—" }}</td>
+              <td class="font-mono">{{ e.paradas.count }}</td>
+              <td class="text-muted small">{{ e.scheduled_for|date:"d/m/Y"|default:"—" }}</td>
+              <td>
+                {% if e.status == 'delivered' %}
+                  <span class="badge badge-success">{{ e.get_status_display }}</span>
+                {% elif e.status == 'in_route' %}
+                  <span class="badge badge-warning">{{ e.get_status_display }}</span>
+                {% elif e.status == 'issue' %}
+                  <span class="badge badge-danger">{{ e.get_status_display }}</span>
+                {% elif e.status == 'picked_up' %}
+                  <span class="badge badge-info">{{ e.get_status_display }}</span>
+                {% else %}
+                  <span class="badge badge-secondary">{{ e.get_status_display }}</span>
+                {% endif %}
+              </td>
+              <td>
+                <a href="{% url 'public_delivery:portal_detail' e.pk %}" class="btn btn-sm btn-outline-primary">Ver</a>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="text-center py-5 text-muted">
+        <p>No hay entregas registradas.</p>
+        <a href="{% url 'public_delivery:portal_create' %}" class="btn btn-primary btn-sm mt-2">Crear la primera</a>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -40,13 +40,10 @@ def _safe_include(route: str, module: str, namespace: str):
         return None
 
 
-def _home(request):
-    return redirect("dashboard:index")
-
-
 urlpatterns = [
     path("admin/", admin.site.urls),
-    path("", _home, name="home"),
+    # Landing page pública (no requiere autenticación)
+    path("", include("landing.urls", namespace="landing")),
 ]
 
 for route, module, namespace in [
@@ -62,6 +59,8 @@ for route, module, namespace in [
     ("rutas/", "routes.urls", "routes"),
     ("rendiciones/", "rendiciones.urls", "rendiciones"),
     ("optimizador/", "delivery_optimizer.urls", "delivery_optimizer"),
+    # Entregas públicas: tracking, conductor panel, portal admin
+    ("", "public_delivery.urls", "public_delivery"),
 ]:
     included = _safe_include(route, module, namespace)
     if included is not None:

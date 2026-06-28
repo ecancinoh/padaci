@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Panel Conductor — Transportes PADACI</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    html { scroll-behavior: smooth; }
+    body { background-color: #f7f5ef; color: #171b1b; font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; }
+  </style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="border-b border-[#ddd8c9] bg-white">
+  <div class="mx-auto flex max-w-5xl items-center justify-between px-5 py-4 sm:px-8">
+    <a href="/" class="inline-flex items-center gap-2 text-sm font-semibold text-[#171b1b] no-underline">
+      <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+      Volver
+    </a>
+    <div class="flex items-center gap-3 font-semibold">
+      <span class="grid place-items-center rounded bg-[#f0c64f] text-[#111817]" style="width:36px;height:36px;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 3h15v13H1z"/><path d="M16 8h4l3 3v5h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+      </span>
+      Transportes PADACI
+    </div>
+    <a href="/accounts/logout/" class="inline-flex items-center gap-2 rounded border border-[#ddd8c9] bg-white px-3 py-2 text-sm font-medium text-[#59625f] no-underline transition hover:bg-[#f7f5ef]">
+      Salir
+    </a>
+  </div>
+</header>
+
+<section class="mx-auto max-w-5xl px-5 py-8 sm:px-8">
+  <div class="mb-6">
+    <p class="text-sm font-semibold text-[#218474]">App interna</p>
+    <h1 class="mt-2 text-4xl font-semibold">Panel Conductor</h1>
+    <p class="mt-3 max-w-2xl leading-7 text-[#59625f]">
+      Hola, <strong>{{ request.user.get_full_name|default:request.user.username }}</strong>. Ingresa el código de ruta para actualizar el estado de las entregas.
+    </p>
+  </div>
+
+  <!-- Búsqueda por código -->
+  <div id="panel-buscar" class="rounded border border-[#ddd8c9] bg-white p-6">
+    <p class="text-sm font-semibold text-[#218474]">Panel conductor</p>
+    <h2 class="mt-2 text-2xl font-semibold">Ingresar código de ruta</h2>
+    <p class="mt-3 text-sm leading-6 text-[#59625f]">Ingresa el código asignado para ver y actualizar los estados de entrega.</p>
+    <div class="mt-5 flex gap-3">
+      <label class="flex flex-1 items-center gap-2 rounded border border-[#cfc8b8] px-3 focus-within:border-[#218474]" style="height:44px;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#218474" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="shrink-0"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input id="codigo-input" type="text" placeholder="Ej: RC-A1B2C3"
+               class="w-full bg-transparent font-mono outline-none uppercase text-sm"
+               autocomplete="off"
+               onkeydown="if(event.key==='Enter') cargarEntrega()" />
+      </label>
+      <button type="button" onclick="cargarEntrega()"
+              class="rounded bg-[#111817] px-5 font-semibold text-white transition hover:bg-[#26312f]"
+              style="height:44px;">
+        Cargar
+      </button>
+    </div>
+    <p id="not-found-msg" class="mt-4 hidden text-sm font-medium text-red-600">No se encontró ninguna ruta con ese código o no tienes acceso.</p>
+  </div>
+
+  <!-- Panel de la entrega cargada -->
+  <div id="panel-entrega" class="hidden mt-5">
+    <!-- Será llenado por JS -->
+  </div>
+
+  <!-- Rutas del día asignadas -->
+  {% if entregas %}
+  <div class="mt-8">
+    <h2 class="mb-4 text-lg font-semibold">Tus rutas activas</h2>
+    <div class="grid gap-3">
+      {% for e in entregas %}
+      <div class="flex items-center justify-between rounded border border-[#ddd8c9] bg-white px-4 py-3">
+        <div>
+          <span class="font-mono font-semibold">{{ e.tracking_code }}</span>
+          <span class="ml-3 text-sm text-[#59625f]">{{ e.get_vehicle_display }} · {{ e.paradas.count }} paradas</span>
+          {% if e.scheduled_for %}<span class="ml-3 text-sm text-[#59625f]">{{ e.scheduled_for|date:"d/m/Y" }}</span>{% endif %}
+        </div>
+        <button type="button"
+                onclick="cargarCodigo('{{ e.tracking_code }}')"
+                class="rounded bg-[#111817] px-3 py-1 text-xs font-semibold text-white transition hover:bg-[#218474]">
+          Abrir
+        </button>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+</section>
+
+<script>
+{% url 'public_delivery:tracking_api' as TRACKING_API %}
+{% url 'public_delivery:conductor_actualizar_estado' as ACTUALIZAR_API %}
+const CSRF = '{{ csrf_token }}';
+
+const STATUS_LABELS = {
+  scheduled: 'Programada',
+  picked_up: 'Retirada',
+  in_route:  'En ruta',
+  delivered: 'Entregada',
+  issue:     'Incidencia',
+};
+const STATUS_COLORS = {
+  scheduled: '#9da5a1',
+  picked_up: '#3b82f6',
+  in_route:  '#c28a10',
+  delivered: '#218474',
+  issue:     '#ef4444',
+};
+
+let currentEntrega = null;
+
+function cargarCodigo(code) {
+  document.getElementById('codigo-input').value = code;
+  cargarEntrega();
+}
+
+async function cargarEntrega() {
+  const code = document.getElementById('codigo-input').value.trim().toUpperCase();
+  if (!code) return;
+  document.getElementById('not-found-msg').classList.add('hidden');
+
+  const res = await fetch('{{ TRACKING_API }}?codigo=' + encodeURIComponent(code));
+  if (!res.ok) {
+    document.getElementById('not-found-msg').classList.remove('hidden');
+    document.getElementById('panel-entrega').classList.add('hidden');
+    return;
+  }
+  const data = await res.json();
+  currentEntrega = data;
+  renderEntrega(data);
+  document.getElementById('panel-entrega').classList.remove('hidden');
+}
+
+function vehicleLabel(v) {
+  if (v === 'jac_x200') return 'JAC X200';
+  if (v === 'maxus_c35l') return 'Maxus C35L';
+  return v;
+}
+
+function renderEntrega(data) {
+  const delivered = data.paradas.filter(p => p.status === 'delivered').length;
+  const color = STATUS_COLORS[data.status] || '#9da5a1';
+
+  const stopsHtml = data.paradas.map(p => {
+    const pcolor = STATUS_COLORS[p.status] || '#9da5a1';
+    const isDone = p.status === 'delivered';
+    const time = p.delivered_at ? ' · ' + new Date(p.delivered_at).toLocaleTimeString('es-CL', {hour:'2-digit',minute:'2-digit'}) : '';
+
+    return `<article class="rounded border border-[#eee8d9] p-4" data-parada-id="${p.id}">
+      <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div class="flex-1">
+          <div class="flex items-center gap-2">
+            <span class="stop-icon" style="color:${pcolor}">${isDone ? '✓' : '○'}</span>
+            <h3 class="font-semibold">${p.label}</h3>
+          </div>
+          <p class="mt-1 text-sm text-[#59625f]">${p.address}</p>
+          <p class="stop-status font-mono text-xs mt-1" style="color:${pcolor}">${STATUS_LABELS[p.status]||p.status}${time}</p>
+        </div>
+        <div class="grid grid-cols-2 gap-2 sm:w-72">
+          <button onclick="actualizarParada(${p.id}, 'in_route')"
+            class="h-10 rounded border border-[#bdd6cf] bg-[#e8f4ef] px-3 text-sm font-semibold text-[#174d44] transition hover:bg-[#d8eee7]">
+            En ruta
+          </button>
+          <button onclick="actualizarParada(${p.id}, 'delivered')"
+            class="h-10 rounded border border-[#218474] bg-[#218474] px-3 text-sm font-semibold text-white transition hover:bg-[#1b6f62]">
+            Entregado
+          </button>
+          <button onclick="actualizarParada(${p.id}, 'issue')"
+            class="h-10 rounded border border-[#e1c777] bg-[#fff3c8] px-3 text-sm font-semibold text-[#5f4300] transition hover:bg-[#ffe9a3]">
+            Incidencia
+          </button>
+          <button onclick="actualizarParada(${p.id}, 'scheduled')"
+            class="h-10 rounded border border-[#cfc8b8] bg-white px-3 text-sm font-semibold text-[#111817] transition hover:bg-[#f7f5ef]">
+            Reabrir
+          </button>
+        </div>
+      </div>
+    </article>`;
+  }).join('');
+
+  document.getElementById('panel-entrega').innerHTML = `
+    <div class="grid gap-5 lg:grid-cols-[0.72fr_1.28fr]">
+      <aside class="rounded border border-[#ddd8c9] bg-white p-5">
+        <p class="font-mono text-sm text-[#59625f]">Código ${data.tracking_code}</p>
+        <h2 class="mt-2 text-2xl font-semibold">Estado de ruta</h2>
+        <div class="mt-5 grid gap-3 text-sm">
+          <div class="flex items-center justify-between border-b border-[#eee8d9] pb-3">
+            <span class="text-[#59625f]">Vehículo</span>
+            <span class="font-semibold">${vehicleLabel(data.vehicle)}</span>
+          </div>
+          <div class="flex items-center justify-between border-b border-[#eee8d9] pb-3">
+            <span class="text-[#59625f]">Estado</span>
+            <span class="font-semibold" id="ruta-status-label">${STATUS_LABELS[data.status]||data.status}</span>
+          </div>
+          <div class="flex items-center justify-between border-b border-[#eee8d9] pb-3">
+            <span class="text-[#59625f]">Progreso</span>
+            <span class="font-semibold" id="ruta-progress">${delivered}/${data.paradas.length} entregas</span>
+          </div>
+        </div>
+        <div class="mt-6 grid gap-3">
+          <button onclick="actualizarRuta('picked_up')"
+            class="inline-flex h-11 items-center justify-center gap-2 rounded bg-[#111817] px-4 font-semibold text-white transition hover:bg-[#26312f]">
+            ✓ Marcar retirado
+          </button>
+          <button onclick="actualizarRuta('in_route')"
+            class="inline-flex h-11 items-center justify-center gap-2 rounded bg-[#f0c64f] px-4 font-semibold text-[#111817] transition hover:bg-[#ffd86a]">
+            ▶ Iniciar ruta
+          </button>
+          <button onclick="document.getElementById('panel-entrega').classList.add('hidden'); currentEntrega=null;"
+            class="inline-flex h-11 items-center justify-center gap-2 rounded border border-[#cfc8b8] bg-white px-4 font-semibold text-[#111817] transition hover:bg-[#f7f5ef]">
+            ↩ Cambiar ruta
+          </button>
+        </div>
+        <div id="historial" class="mt-6 rounded bg-[#f7f5ef] p-4">
+          <h3 class="font-semibold text-sm">Historial</h3>
+          <div id="historial-items" class="mt-2 grid gap-1 text-xs font-mono text-[#59625f]">
+            <p>Sin acciones todavía.</p>
+          </div>
+        </div>
+      </aside>
+      <section class="rounded border border-[#ddd8c9] bg-white p-5">
+        <p class="text-sm font-semibold text-[#218474]">Puntos de entrega</p>
+        <h2 class="mt-1 text-2xl font-semibold">Actualizar estado</h2>
+        <div id="paradas-list" class="mt-5 grid gap-3">${stopsHtml}</div>
+      </section>
+    </div>`;
+}
+
+function addHistorial(text) {
+  const now = new Date().toLocaleTimeString('es-CL', {hour:'2-digit', minute:'2-digit'});
+  const el = document.getElementById('historial-items');
+  if (el.children.length === 1 && el.children[0].textContent === 'Sin acciones todavía.') {
+    el.innerHTML = '';
+  }
+  el.insertAdjacentHTML('afterbegin', `<p>${now} · ${text}</p>`);
+}
+
+async function actualizarRuta(estado) {
+  if (!currentEntrega) return;
+  const fd = new FormData();
+  fd.append('tipo', 'ruta');
+  fd.append('entrega_id', currentEntrega.id);
+  fd.append('estado', estado);
+
+  const res = await fetch('{{ ACTUALIZAR_API }}', {
+    method: 'POST',
+    headers: {'X-CSRFToken': CSRF},
+    body: fd,
+  });
+  const data = await res.json();
+  if (!data.ok) { addHistorial('Error: ' + (data.error||'desconocido')); return; }
+  currentEntrega.status = estado;
+  document.getElementById('ruta-status-label').textContent = STATUS_LABELS[estado]||estado;
+  addHistorial('Estado de ruta: ' + (STATUS_LABELS[estado]||estado));
+}
+
+async function actualizarParada(paradaId, estado) {
+  if (!currentEntrega) return;
+  const fd = new FormData();
+  fd.append('tipo', 'parada');
+  fd.append('entrega_id', currentEntrega.id);
+  fd.append('parada_id', paradaId);
+  fd.append('estado', estado);
+
+  const res = await fetch('{{ ACTUALIZAR_API }}', {
+    method: 'POST',
+    headers: {'X-CSRFToken': CSRF},
+    body: fd,
+  });
+  const data = await res.json();
+  if (!data.ok) { addHistorial('Error: ' + (data.error||'desconocido')); return; }
+
+  // Update local data
+  const parada = currentEntrega.paradas.find(p => p.id === paradaId);
+  if (parada) {
+    parada.status = data.nuevo_estado;
+    parada.delivered_at = data.delivered_at;
+    const label = parada.label;
+    addHistorial(`${label}: ${STATUS_LABELS[data.nuevo_estado]||data.nuevo_estado}`);
+  }
+  if (data.ruta_status) {
+    currentEntrega.status = data.ruta_status;
+    document.getElementById('ruta-status-label').textContent = STATUS_LABELS[data.ruta_status]||data.ruta_status;
+  }
+
+  // Re-count progress
+  const delivered = currentEntrega.paradas.filter(p => p.status === 'delivered').length;
+  document.getElementById('ruta-progress').textContent = `${delivered}/${currentEntrega.paradas.length} entregas`;
+
+  // Update the specific stop card inline
+  const allCards = document.querySelectorAll('#paradas-list article');
+  // find the card by data-parada-id
+  const card = document.querySelector(`#paradas-list article[data-parada-id="${paradaId}"]`);
+  if (card && parada) {
+    const pcolor = STATUS_COLORS[parada.status] || '#9da5a1';
+    const time = parada.delivered_at ? ' · ' + new Date(parada.delivered_at).toLocaleTimeString('es-CL', {hour:'2-digit',minute:'2-digit'}) : '';
+    card.querySelector('.stop-status').textContent = (STATUS_LABELS[parada.status]||parada.status) + time;
+    card.querySelector('.stop-status').style.color = pcolor;
+    card.querySelector('.stop-icon').textContent = parada.status === 'delivered' ? '✓' : '○';
+    card.querySelector('.stop-icon').style.color = pcolor;
+  }
+}
+</script>
+</body>
+</html>

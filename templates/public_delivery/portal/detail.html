@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% block title %}{{ entrega.tracking_code }}{% endblock %}
+{% block active_public_delivery %}active{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+  <div class="d-sm-flex align-items-center justify-content-between mb-4">
+    <div>
+      <h1 class="h3 mb-0 text-gray-800">{{ entrega.tracking_code }}</h1>
+      <small class="text-muted">Creada {{ entrega.created_at|date:"d/m/Y H:i" }}</small>
+    </div>
+    <a href="{% url 'public_delivery:portal_list' %}" class="btn btn-secondary btn-sm">
+      <i class="fas fa-arrow-left fa-sm mr-1"></i> Volver
+    </a>
+  </div>
+
+  <div class="row">
+    <!-- Info + estado -->
+    <div class="col-lg-4">
+      <div class="card shadow mb-4">
+        <div class="card-header py-3"><h6 class="m-0 font-weight-bold text-primary">Información</h6></div>
+        <div class="card-body">
+          <dl class="row mb-0">
+            <dt class="col-5 text-muted small">Código</dt>
+            <dd class="col-7 font-weight-bold font-mono">{{ entrega.tracking_code }}</dd>
+            <dt class="col-5 text-muted small">Vehículo</dt>
+            <dd class="col-7 small">{{ entrega.get_vehicle_display }}</dd>
+            <dt class="col-5 text-muted small">Conductor</dt>
+            <dd class="col-7 small">{{ entrega.driver_name|default:"Sin asignar" }}</dd>
+            <dt class="col-5 text-muted small">Cliente</dt>
+            <dd class="col-7 small">{{ entrega.client_name|default:"—" }}</dd>
+            {% if entrega.client_phone %}
+            <dt class="col-5 text-muted small">Teléfono</dt>
+            <dd class="col-7 small">{{ entrega.client_phone }}</dd>
+            {% endif %}
+            <dt class="col-5 text-muted small">Fecha</dt>
+            <dd class="col-7 small">{{ entrega.scheduled_for|date:"d/m/Y"|default:"—" }}</dd>
+          </dl>
+          {% if entrega.notes %}
+          <hr />
+          <p class="small text-muted mb-0">{{ entrega.notes }}</p>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Cambiar estado -->
+      <div class="card shadow mb-4">
+        <div class="card-header py-3"><h6 class="m-0 font-weight-bold text-primary">Estado actual</h6></div>
+        <div class="card-body">
+          <p class="mb-3">
+            {% if entrega.status == 'delivered' %}
+              <span class="badge badge-success badge-pill px-3 py-2">{{ entrega.get_status_display }}</span>
+            {% elif entrega.status == 'in_route' %}
+              <span class="badge badge-warning badge-pill px-3 py-2">{{ entrega.get_status_display }}</span>
+            {% elif entrega.status == 'issue' %}
+              <span class="badge badge-danger badge-pill px-3 py-2">{{ entrega.get_status_display }}</span>
+            {% elif entrega.status == 'picked_up' %}
+              <span class="badge badge-info badge-pill px-3 py-2">{{ entrega.get_status_display }}</span>
+            {% else %}
+              <span class="badge badge-secondary badge-pill px-3 py-2">{{ entrega.get_status_display }}</span>
+            {% endif %}
+          </p>
+          <form method="post" action="{% url 'public_delivery:portal_edit_status' entrega.pk %}">
+            {% csrf_token %}
+            <div class="input-group input-group-sm">
+              <select name="status" class="form-control">
+                {% for val, label in status_choices %}
+                <option value="{{ val }}" {% if entrega.status == val %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+              <div class="input-group-append">
+                <button type="submit" class="btn btn-primary">Cambiar</button>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Paradas -->
+    <div class="col-lg-5">
+      <div class="card shadow mb-4">
+        <div class="card-header py-3"><h6 class="m-0 font-weight-bold text-primary">Paradas ({{ entrega.paradas.count }})</h6></div>
+        <div class="card-body p-0">
+          {% if entrega.paradas.exists %}
+          <ul class="list-group list-group-flush">
+            {% for p in entrega.paradas.all %}
+            <li class="list-group-item">
+              <div class="d-flex align-items-start justify-content-between">
+                <div>
+                  <span class="badge badge-secondary mr-2">{{ p.stop_order }}</span>
+                  <strong class="small">{{ p.label }}</strong>
+                  <div class="text-muted small mt-1">{{ p.address }}</div>
+                  {% if p.delivered_at %}
+                  <div class="text-success small">Entregado {{ p.delivered_at|date:"d/m/Y H:i" }}</div>
+                  {% endif %}
+                </div>
+                <span class="small">
+                  {% if p.status == 'delivered' %}
+                    <span class="badge badge-success">{{ p.get_status_display }}</span>
+                  {% elif p.status == 'issue' %}
+                    <span class="badge badge-danger">{{ p.get_status_display }}</span>
+                  {% elif p.status == 'in_route' or p.status == 'picked_up' %}
+                    <span class="badge badge-warning">{{ p.get_status_display }}</span>
+                  {% else %}
+                    <span class="badge badge-secondary">{{ p.get_status_display }}</span>
+                  {% endif %}
+                </span>
+              </div>
+            </li>
+            {% endfor %}
+          </ul>
+          {% else %}
+          <p class="text-muted text-center py-4 small">Sin paradas registradas.</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Eventos / historial -->
+    <div class="col-lg-3">
+      <div class="card shadow mb-4">
+        <div class="card-header py-3"><h6 class="m-0 font-weight-bold text-primary">Historial</h6></div>
+        <div class="card-body p-0" style="max-height:400px; overflow-y:auto;">
+          {% if entrega.eventos.exists %}
+          <ul class="list-group list-group-flush">
+            {% for ev in entrega.eventos.all %}
+            <li class="list-group-item py-2">
+              <div class="small font-weight-bold">{{ ev.created_at|date:"d/m H:i" }}</div>
+              <div class="small text-muted">{{ ev.note }}</div>
+            </li>
+            {% endfor %}
+          </ul>
+          {% else %}
+          <p class="text-muted text-center py-4 small">Sin eventos.</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

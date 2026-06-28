@@ -144,6 +144,16 @@
       </li>
       {% endif %}
 
+      {% if user.rol == 'admin' or user.rol == 'supervisor' %}
+      <li class="nav-item {% block active_public_delivery %}{% endblock %}">
+        {% url 'public_delivery:portal_list' as url_public_delivery_list %}
+        <a class="nav-link" href="{{ url_public_delivery_list|default:'#' }}">
+          <i class="fas fa-fw fa-shipping-fast"></i>
+          <span>Entregas Públicas</span>
+        </a>
+      </li>
+      {% endif %}
+
       <hr class="sidebar-divider">
       <div class="sidebar-heading">Geolocalización</div>
 
